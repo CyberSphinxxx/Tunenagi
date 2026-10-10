@@ -1,0 +1,13 @@
+{
+  "project": "Tunenagi",
+  "schemaVersion": 1,
+  "target": "Android v1.0",
+  "initialized": false,
+  "currentPhase": "00",
+  "lastCheckpointUtc": null,
+  "lastInvocationUtc": null,
+  "latestVerifiedTask": null,
+  "releaseReady": false,
+  "publicReleasePublished": false,
+  "comment": "Status is descriptive. Task/evidence and audited proof determine release readiness."
+}

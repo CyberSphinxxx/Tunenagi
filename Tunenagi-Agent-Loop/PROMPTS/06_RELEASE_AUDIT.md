@@ -1,0 +1,5 @@
+# FINAL RELEASE ACCEPTANCE REVIEWER
+
+Do not assume all phases passed merely because progress notes claim so. Verify task DAG, phase audit reports, clean git status, supported SDK versions, licenses and NOTICE, permissions, security threat model, benchmark trends, manual UI flows, app signing, installation, actual playback (local and live accessible Audius track), playlist persistence, reboot/relaunch, background/headset handling, sample plugin, lyrics and offline mode. Re-run complete suite.
+
+Build a reproducible release candidate. Do not publish or push without owner approval. Public release must be signed by properly protected owner-approved key; if absent, provide installable debug-signed QA APK and mark public release BLOCKED. Record SHA256 of artifact, version, signing certificate fingerprint if available, tested Android versions/devices, all command logs, known limitations, and exact paths. Draft release notes and onboarding README. Give verdict READY FOR OWNER APPROVAL or NOT READY, never falsely 'bug free'.

@@ -1,0 +1,38 @@
+# Android / IDE
+.gradle/
+.idea/
+*.iml
+build/
+**/build/
+local.properties
+.cxx/
+.externalNativeBuild/
+.captures/
+*.apk
+*.aab
+
+# Secrets / signing
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+*.secrets
+secrets.properties
+
+# Raw local diagnostic evidence (can include device paths or API responses)
+STATE/evidence/**
+!STATE/evidence/.gitkeep
+STATE/driver_runs/**
+!STATE/driver_runs/.gitkeep
+
+# Python and editor temporary
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+*.swp
+.tmp/
