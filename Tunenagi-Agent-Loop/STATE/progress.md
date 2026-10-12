@@ -52,3 +52,51 @@ Do not erase previous entries. Each entry records what actually ran and what it 
 - **Next exact action**: claim TUN-0003 (design tokens and navigation shell) — three-tab
   Compose shell, player host navigation, empty states, then install and launch on an
   emulator/device and capture device evidence.
+
+## 2026-10-12T18:10Z - deepseek-v4-flash session (TUN-0003)
+
+- **Phase/task**: Phase 00 / TUN-0003 "Design tokens and navigation shell" - claimed,
+  implemented, command evidence captured, **device evidence blocked** (stays `in_progress`).
+- **Summary/change paths**: moved the design tokens into `:core` as plain ARGB/dp/ms values with
+  a real WCAG contrast audit, then built the three-tab shell, the player route, the responsive
+  scaffold and the empty states on top of them.
+  New: `core/src/main/java/com/tunenagi/core/designsystem/{TunenagiPalette,TunenagiContrast,TunenagiTokens}.kt`,
+  `core/src/test/java/com/tunenagi/core/designsystem/{TunenagiContrastTest,TunenagiTokensTest}.kt`,
+  `app/src/main/java/com/tunenagi/player/ui/shell/{TunenagiDestinations,MiniPlayer,TunenagiEmptyState,TunenagiShell}.kt`,
+  `app/src/main/java/com/tunenagi/player/ui/screens/{HomeScreen,SearchScreen,LibraryScreen,PlayerScreen}.kt`,
+  `app/src/androidTest/java/com/tunenagi/player/ui/shell/TunenagiShellTest.kt`.
+  Changed: `app/.../ui/theme/Color.kt` (now delegates to the core palette), `Theme.kt` (audited
+  outline and supporting-text roles), `MainActivity.kt` (hosts the shell),
+  `app/src/main/res/values/strings.xml`, `app/build.gradle.kts` and `gradle/libs.versions.toml`
+  (Compose ui-test and material-icons-core artefacts).
+- **Commands and exit codes (evidence paths)**:
+  - `clean :core:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+    --no-build-cache --console=plain` -> exit 0, `BUILD SUCCESSFUL`, 102/102 tasks executed,
+    25 tests / 0 failures (6 toolchain + 11 contrast + 8 tokens).
+    Evidence: `STATE/evidence/TUN-0003/20261012T180122Z-clean-build-and-unit-tests.json`;
+    APK facts in `STATE/evidence/TUN-0003/apk-debug-build-artifact.txt` (13,448,693 bytes,
+    sha256 ecbe296e703dc2d27b5438bcda0aa0cf6de670949156132634955ca69a6265ef).
+  - Not run: `:app:connectedDebugAndroidTest` - no Android runtime is available (see below).
+- **Audit findings**: the `#35394A` outline measures 1.70:1 (background) / 1.53:1 (surface),
+  below the 3:1 non-text threshold, and `#B6B8C5` on the `#5C54B8` subdued accent is 3.12:1,
+  below AA text. Both are recorded as explicit prohibitions with tests asserting they fail;
+  `OutlineStrong` `#6E7288` (4.09 / 3.69 / 3.08) was added for meaningful boundaries. ADR-002.
+- **Environment defect found and corrected**: `org.gradle.java.home` in `local.properties` is
+  silently ignored by Gradle (only AGP reads that file, for `sdk.dir`), so `bash gradlew` picked
+  JDK 25 from PATH and failed with `IllegalArgumentException: 25.0.1` before any project code
+  ran. The working invocation is `JAVA_HOME=C:/Users/CyberSphinx/jdk-21/jdk-21.0.12.1+1 bash
+  gradlew ...`. The misleading comment in `local.properties` (machine-local, untracked) was
+  corrected.
+- **Device / emulator observations**: emulator 37.2.12 and the API 33 google_apis x86_64 system
+  image are now installed under `C:/Android`. No device is attached; the AEHD hypervisor driver
+  is not installed and the elevation attempt was cancelled at UAC, so `sc query aehd` still
+  returns 1060. No device screenshot exists and none was fabricated.
+- **Commit SHA**: recorded in the follow-up commit to this log.
+- **Blockers or risks**: see `STATE/blockers.md` - the x86_64 emulator cannot start on this host
+  without the AEHD driver or a physical device. Untracked build junk at the loop root
+  (`gradle-8.11.1-bin.zip`, `.gradle-native/`, `.kotlin/`, `build_fail.log`) should be absorbed by
+  TUN-0004's strict .gitignore.
+- **Next exact action**: obtain an Android runtime (approve the AEHD elevation or attach a
+  device), run `:app:connectedDebugAndroidTest`, install and launch the debug APK, capture
+  `device-*.png` screenshots, then `taskctl.py verify TUN-0003 --artifact ...`. If the runtime
+  stays unavailable, work TUN-0004 next.

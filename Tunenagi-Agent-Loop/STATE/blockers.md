@@ -1,7 +1,39 @@
 # Tunenagi active blockers
 
-No task is currently blocked. This file records the blocker that was resolved so a future
-session does not repeat the same dead end.
+One task is currently blocked. This file records the active blocker exactly, and keeps the
+resolved ones so a future session does not repeat the same dead end.
+
+## ACTIVE - TUN-0003 needs an Android runtime (raised 2026-10-12T18:05Z)
+
+**Task:** TUN-0003 (design tokens and navigation shell). Its `evidenceKinds` are `command`
+and `device`, and `taskctl verify` requires a non-empty `device-`-prefixed artifact.
+
+**State of the work:** tokens, the three-tab shell, the player route, the mini-player slot
+and the empty states are implemented and green: clean build plus 25 JVM unit tests,
+evidence `STATE/evidence/TUN-0003/20261012T180122Z-clean-build-and-unit-tests.json`
+(BUILD SUCCESSFUL, exit 0, 102/102 tasks executed). Only the on-device install/launch proof
+is missing.
+
+**Exact failure:** `C:/Android/platform-tools/adb.exe devices` reports no attached device;
+`C:/Android/emulator/emulator-check.exe accel` reports "Android Emulator hypervisor driver
+is not installed on this machine". This host has Hyper-V/WHPX disabled and no accelerator
+driver, and the x86_64 system image refuses to boot without one - `-accel off` is not a
+supported fallback for x86 guests, the emulator demands hardware acceleration. Installing
+Google's AEHD driver (`C:/Android/extras/google/Android_Emulator_Hypervisor_Driver`, already
+downloaded) requires administrator rights.
+
+**Attempts:** 1. Elevated `silent_install.bat` through the approved-elevation flow -> the UAC
+prompt was cancelled, so nothing ran; `sc query aehd` still returns 1060 (no such service).
+
+**Required external action (any one):**
+1. Approve the elevation prompt for the AEHD driver install, then re-run the emulator path; or
+2. Attach a physical Android device with USB debugging enabled (API 26+).
+
+**Safe fallback actually taken instead of faking it:** an unaccelerated JVM or a mock-only
+substitute is not valid evidence for a `device` kind, so the task stays `in_progress`, no
+device artifact is fabricated, and independent non-device work continues.
+
+**Next eligible task while this is blocked:** TUN-0004 (repository hygiene and licenses).
 
 ## RESOLVED — TUN-0002 blocked on build runtime JDK
 

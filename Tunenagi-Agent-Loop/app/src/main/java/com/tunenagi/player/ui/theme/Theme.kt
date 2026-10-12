@@ -5,7 +5,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
@@ -18,8 +17,16 @@ private val TunenagiDarkColorScheme = darkColorScheme(
     surface = TunenagiColors.Surface,
     onBackground = TunenagiColors.OnBackground,
     onSurface = TunenagiColors.OnSurface,
+    // Supporting text (artist lines, helper copy) rather than a container colour.
+    onSurfaceVariant = TunenagiColors.Secondary,
     surfaceVariant = TunenagiColors.Overlay,
-    outline = TunenagiColors.Outline
+    // Material uses `outline` for boundaries that carry meaning, so it takes the audited
+    // strong token; the low-contrast divider token goes to `outlineVariant`, where it is
+    // decorative and its 1.70:1 measurement is not a failure.
+    outline = TunenagiColors.OutlineStrong,
+    outlineVariant = TunenagiColors.Outline,
+    error = TunenagiColors.Danger,
+    onError = TunenagiColors.Background
 )
 
 /**
