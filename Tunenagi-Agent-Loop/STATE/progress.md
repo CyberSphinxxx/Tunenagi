@@ -91,7 +91,7 @@ Do not erase previous entries. Each entry records what actually ran and what it 
   image are now installed under `C:/Android`. No device is attached; the AEHD hypervisor driver
   is not installed and the elevation attempt was cancelled at UAC, so `sc query aehd` still
   returns 1060. No device screenshot exists and none was fabricated.
-- **Commit SHA**: recorded in the follow-up commit to this log.
+- **Commit SHA**: d28ac34c1dd603f6cc39c9ccf25d18f5b9bf366f
 - **Blockers or risks**: see `STATE/blockers.md` - the x86_64 emulator cannot start on this host
   without the AEHD driver or a physical device. Untracked build junk at the loop root
   (`gradle-8.11.1-bin.zip`, `.gradle-native/`, `.kotlin/`, `build_fail.log`) should be absorbed by
