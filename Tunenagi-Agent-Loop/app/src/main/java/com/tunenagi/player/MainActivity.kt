@@ -7,17 +7,17 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import com.tunenagi.player.ui.shell.TunenagiShell
 import com.tunenagi.player.ui.theme.TunenagiTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
  * Tunenagi main activity — owned.
  *
- * Host for the Compose shell defined in the UX pass. Right now it publishes a single
- * neutral screen so the build targets a real activity, not a stub, while the 3-tab
- * navigation and player host are added in the shell task.
+ * Host for the Compose shell: three tabs, the player route and the mini-player slot. It
+ * holds no navigation state of its own, so the shell survives configuration changes and
+ * the player route can later be driven from a media session without touching the activity.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -30,10 +30,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    Text(
-                        text = "Tunenagi — shell pending",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
+                    TunenagiShell()
                 }
             }
         }

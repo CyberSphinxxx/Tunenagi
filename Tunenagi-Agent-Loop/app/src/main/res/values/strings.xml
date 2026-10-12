@@ -1,4 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Tunenagi</string>
+
+    <!-- Navigation -->
+    <string name="tab_home">Home</string>
+    <string name="tab_search">Search</string>
+    <string name="tab_library">Library</string>
+    <string name="action_open_search">Search</string>
+
+    <!-- Home -->
+    <string name="home_empty_title">Nothing here yet</string>
+    <string name="home_empty_message">Songs you play and save will show up here. Search your device and your sources to get started.</string>
+
+    <!-- Search -->
+    <string name="search_title">Search</string>
+    <string name="search_label">Search</string>
+    <string name="search_hint">Songs, artists, albums</string>
+    <string name="search_empty_title">Search your music</string>
+    <string name="search_empty_message">Search will cover music on your device and any sources you add.</string>
+
+    <!-- Library -->
+    <string name="library_empty_title">Your library is empty</string>
+    <string name="library_empty_message">Songs you import or save will appear here.</string>
+
+    <!-- Player -->
+    <string name="player_title">Now playing</string>
+    <string name="player_close">Close player</string>
+    <string name="player_empty_title">Nothing is playing</string>
+    <string name="player_empty_message">Choose a track from Home, Search or your Library to start playback.</string>
 </resources>
