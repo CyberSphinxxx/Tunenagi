@@ -18,9 +18,12 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0001\\20261011T045520Z-preflight-neg-tests-v2.json",
+        "STATE\\evidence\\TUN-0001\\device-preflight.txt"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-11T04:56:56+00:00; semantic review still required."
     },
     {
       "id": "TUN-0002",
@@ -39,9 +42,13 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0002\\20261012T070749Z-clean-no-cache-build.json",
+        "STATE\\evidence\\TUN-0002\\apk-debug-build-artifact.txt",
+        "STATE\\evidence\\TUN-0002\\20261012T070717Z-core-unit-tests.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-12T07:08:47+00:00; semantic review still required."
     },
     {
       "id": "TUN-0003",

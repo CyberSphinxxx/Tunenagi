@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tunenagi launcher icon background color — owned, matches the dark surface
+         token in SPEC/UX_DESIGN.md (#0C0D12) as the visual baseline for the app icon. -->
+    <color name="ic_launcher_background">#0C0D12</color>
+</resources>

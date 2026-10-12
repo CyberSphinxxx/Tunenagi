@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Tunenagi app manifest — owned. Feature permissions are added with the
+         feature that needs them (media playback, storage, notifications) following
+         the UX and audio-engineering spec, never all at once. -->
+
+    <application
+        android:name="com.tunenagi.player.TunenagiApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Tunenagi">
+
+        <activity
+            android:name="com.tunenagi.player.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Tunenagi">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>

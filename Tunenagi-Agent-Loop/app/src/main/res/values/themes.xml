@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tunenagi app theme — owned. The design-token system from SPEC/UX_DESIGN.md is
+         implemented in Compose; this XML theme is the Android entry point only and
+         should not drift from the Compose tokens. -->
+
+    <style name="Theme.Tunenagi" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!--
+        Tunenagi launcher icon foreground — owned placeholder.
+        The real brand artwork is authored later in the UX pass; this placeholder makes
+        the build and manifest valid. Replace with the final vector artwork before any
+        visual release gate.
+    -->
+    <path
+        android:fillColor="#A99BFA"
+        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0"/>
+</vector>
