@@ -138,35 +138,52 @@ session using the secure desktop).
 
 ## Procedure once a runtime exists
 
-The implementation side of TUN-0003 is already committed (`d28ac34`, `880fca6`); only the
-device evidence is outstanding. With any runtime attached:
+The implementation side of TUN-0003 is already committed (`d28ac34`, `880fca6`); only the device
+evidence is outstanding. Every later phase needs the same kind of proof, so the procedure is
+executable rather than a list of commands to retype:
 
-    # 1. Instrumented tests on the real device (this is the acceptance test)
-    python SCRIPTS/run_check.py --task TUN-0003 --name connected-android-test -- \
-        bash gradlew :app:connectedDebugAndroidTest
+    python SCRIPTS/device_evidence.py --task TUN-0003
+    python SCRIPTS/device_evidence.py --task TUN-0003 --avd tunenagi_api33   # boot it first
+    python SCRIPTS/device_evidence.py --preflight                            # report only
 
-    # 2. Install and launch the debug build
-    bash gradlew :app:assembleDebug
+`SCRIPTS/device_evidence.py` does five things and stops at the first real failure:
+
+1. **Preflight** - finds `adb` and a device whose state is `device`. An `offline`/`unauthorized`
+   device is reported as unusable rather than absent, because the two need different fixes.
+2. **Instrumented tests** - `:app:connectedDebugAndroidTest` through `SCRIPTS/run_check.py`, so
+   the run lands as a manifest `taskctl` accepts.
+3. **Install and launch** - installs `app-debug.apk`, then waits until the process actually runs
+   (`pidof com.tunenagi.player`) instead of trusting that `am start` returned.
+4. **Screenshots** - taps the three bottom-bar destinations and captures `device-home.png`,
+   `device-search.png` and `device-library.png`. Bytes that are not a real PNG are deleted,
+   never kept as a placeholder.
+5. **Verify** - `taskctl verify TUN-0003 --evidence <manifest> --artifact device-*.png`.
+
+Two deliberate refusals keep it honest:
+
+- It will not boot an AVD without a working accelerator (`--allow-unaccelerated` exists only to
+  re-test the finding above). Booting the measured-broken path would waste twenty minutes and
+  still produce no evidence.
+- It never writes a `device-` artifact it did not receive from a device, because `taskctl
+  verify` exists to refuse exactly that claim. A failed run leaves the task status untouched.
+
+`gradlew` needs JDK 17-21 on `PATH`/`JAVA_HOME`; on this machine that is
+`C:/Users/CyberSphinx/jdk-21/jdk-21.0.12.1+1`, and the script discovers it through
+`SCRIPTS/verify.py` rather than restating the search (ADR-001).
+
+An emulator boot on 2 host cores is slow even when accelerated, so the script polls
+`sys.boot_completed` with a bounded timeout (default 900 s) instead of sleeping a fixed amount,
+and keeps the emulator's console log at `STATE/evidence/<task>/emulator-boot.log`.
+
+The manual equivalent, if the script is unavailable for some reason:
+
+    bash gradlew :app:connectedDebugAndroidTest
     adb install -r app/build/outputs/apk/debug/app-debug.apk
     adb shell am start -n com.tunenagi.player/.MainActivity
-
-    # 3. Real screenshots (one per tab plus the player route)
     adb exec-out screencap -p > STATE/evidence/TUN-0003/device-home.png
-    adb shell input tap <x> <y>   # Search tab, then Library tab
-    adb exec-out screencap -p > STATE/evidence/TUN-0003/device-search.png
-
-    # 4. Verify the task with both the command manifest and the device artifacts
     python SCRIPTS/taskctl.py verify TUN-0003 \
         --evidence STATE/evidence/TUN-0003/<manifest>.json \
         --artifact STATE/evidence/TUN-0003/device-home.png
-
-`gradlew` needs JDK 17-21 on `PATH`/`JAVA_HOME`; on this machine that is
-`C:/Users/CyberSphinx/jdk-21/jdk-21.0.12.1+1`. `SCRIPTS/verify.py` discovers it automatically
-and is the safer entry point for the Gradle steps.
-
-An emulator boot on 2 host cores is slow even accelerated: poll
-`adb shell getprop sys.boot_completed` until it prints `1` rather than assuming a fixed delay,
-and give the first instrumented run several minutes before judging it hung.
 
 ## What this document is not
 
