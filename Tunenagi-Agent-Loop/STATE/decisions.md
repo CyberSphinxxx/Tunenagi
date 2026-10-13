@@ -355,3 +355,31 @@ and TUN-0106 (the repositories that use the new tables), every later phase that 
 
 **Owner review needed?** No: no product requirement changed, and the phase-01 audit reviews the
 split explicitly.
+
+## ADR-010 - Machine-written files are excluded by path from the text gate (2026-10-14)
+
+**Context**: Room exports its schema JSON into `core/schemas/` on every build, and it does not end
+those files with a newline. `SCRIPTS/check_format.py` rule F3 therefore failed on both committed
+schema files. The alternatives were to hand-edit generated files (the edit is lost on the next
+build, and a schema that a person edited is a schema nobody can trust) or to weaken a rule.
+
+**Options**: (a) edit the two JSON files by hand; (b) relax F3 for all JSON; (c) exclude a named
+directory of generated output from the gate, by path, and keep every hand-written file under the
+full rule set.
+
+**Decision**: (c). `check_format.py` gains `GENERATED_DIRS = ("core/schemas/",)`. F3 still applies
+to every JSON, XML, Markdown, Gradle, Kotlin, Python and shell file a person writes; only Room's
+export directory is skipped, and the reason is written in the script and audited at the phase gate.
+
+**Consequences**:
+- The alternative in (a) would have produced a gate that fails again after the next build, which is
+  how a gate gets ignored. (b) would have disabled a real rule for the backup format and every other
+  JSON file in the project.
+- This is a change to enforcement code, so `OPERATIONS/STATE_PROTOCOL.md` requires independent audit
+  coverage: the phase-01 audit re-ran the gate's `--self-test` after the change and recorded that it
+  still fails on tabs, trailing whitespace, a missing final newline, CRLF and over-long lines.
+
+**Affected tasks**: TUN-0004 (the gate's owner), TUN-0103 (the schema export that exposed this),
+every future schema version, the phase-01 audit.
+
+**Owner review needed?** No: no product behaviour and no hand-written file's rule changed.

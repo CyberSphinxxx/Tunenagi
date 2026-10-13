@@ -189,9 +189,9 @@
       ],
       "status": "verified",
       "evidence": [
-        "STATE\\evidence\\TUN-0102\\20261013T200423Z-room-schema-and-dao-tests.json"
+        "STATE\\evidence\\TUN-0102\\20261013T203306Z-source-loss-regression.json"
       ],
-      "notes": "Verified via evidence manifest 2026-10-13T20:05:03+00:00; semantic review still required."
+      "notes": "Verified via evidence manifest 2026-10-13T20:34:22+00:00; semantic review still required."
     },
     {
       "id": "TUN-0103",

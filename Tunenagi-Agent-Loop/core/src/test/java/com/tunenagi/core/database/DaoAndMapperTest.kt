@@ -192,8 +192,10 @@ class DaoAndMapperTest {
             db.trackDao().insert(TunenagiMappers.toTrackEntity(Fixtures.track(title = it), Fixtures.now, Fixtures.now))
         }
         assertEquals(listOf("The Slow Tide"), db.trackDao().searchByTitle("tide").map { it.title })
-        assertEquals("a lowercase term finds a capitalised title", listOf("Tidal Drift"), db.trackDao().searchByTitle("tidal").map { it.title })
-        assertEquals("a capitalised term finds a lowercase match", listOf("The Slow Tide"), db.trackDao().searchByTitle("THE SLOW").map { it.title })
+        val lower = db.trackDao().searchByTitle("tidal").map { it.title }
+        assertEquals("a lowercase term finds a capitalised title", listOf("Tidal Drift"), lower)
+        val upper = db.trackDao().searchByTitle("THE SLOW").map { it.title }
+        assertEquals("a capitalised term finds a lowercase match", listOf("The Slow Tide"), upper)
         assertEquals(0, db.trackDao().searchByTitle("nothing").size)
     }
 
@@ -216,7 +218,8 @@ class DaoAndMapperTest {
         assertTrue(enumFailure.message.orEmpty().contains("maybe"))
 
         db.openHelper.writableDatabase.execSQL(
-            "INSERT INTO tracks (id, title, sortTitle, durationMs, albumId, isrc, mbid, artworkRef, createdAt, updatedAt, deletedTombstone) " +
+            "INSERT INTO tracks (id, title, sortTitle, durationMs, albumId, isrc, mbid, artworkRef, " +
+                "createdAt, updatedAt, deletedTombstone) " +
                 "VALUES ('provider-track-1', 'T', 't', NULL, NULL, NULL, NULL, NULL, 0, 0, 0)"
         )
         val corruptTrack = db.trackDao().byId("provider-track-1")!!

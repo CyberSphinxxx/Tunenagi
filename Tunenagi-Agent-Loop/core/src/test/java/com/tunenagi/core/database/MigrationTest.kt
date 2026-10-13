@@ -61,18 +61,21 @@ class MigrationTest {
         )
         listOf(trackA to "The Slow Tide", trackB to "Nightfall").forEachIndexed { index, (id, title) ->
             db.execSQL(
-                "INSERT INTO tracks (id, title, sortTitle, durationMs, albumId, isrc, mbid, artworkRef, createdAt, updatedAt, deletedTombstone) " +
+                "INSERT INTO tracks (id, title, sortTitle, durationMs, albumId, isrc, mbid, artworkRef, " +
+                    "createdAt, updatedAt, deletedTombstone) " +
                     "VALUES (?, ?, ?, 190000, ?, NULL, NULL, NULL, 1000, 1000, 0)",
                 arrayOf(id, title, title.lowercase(), if (index == 0) albumId else null)
             )
         }
         db.execSQL(
-            "INSERT INTO track_sources (id, trackId, providerId, externalId, localUri, sourceVariant, contentType, availability, lastCheckedAt, preferred, locked) " +
+            "INSERT INTO track_sources (id, trackId, providerId, externalId, localUri, sourceVariant, " +
+                "contentType, availability, lastCheckedAt, preferred, locked) " +
                 "VALUES (?, ?, 'builtin.local', 'media/1', 'content://media/external/audio/1', '', 'audio/mpeg', 'Available', 1000, 1, 0)",
             arrayOf(localSourceId, trackA)
         )
         db.execSQL(
-            "INSERT INTO track_sources (id, trackId, providerId, externalId, localUri, sourceVariant, contentType, availability, lastCheckedAt, preferred, locked) " +
+            "INSERT INTO track_sources (id, trackId, providerId, externalId, localUri, sourceVariant, " +
+                "contentType, availability, lastCheckedAt, preferred, locked) " +
                 "VALUES (?, ?, 'builtin.audius', 'D7KyD', NULL, 'stream', NULL, 'Restricted', 1000, 0, 0)",
             arrayOf(audiusSourceId, trackA)
         )
@@ -91,12 +94,14 @@ class MigrationTest {
         )
         db.execSQL("INSERT INTO favorites (trackId, addedAt) VALUES (?, 1500)", arrayOf(trackB))
         db.execSQL(
-            "INSERT INTO lyrics_cache (trackId, provider, language, syncedLrc, plainText, provenanceUrl, fetchedAt, etag, matchConfidence) " +
+            "INSERT INTO lyrics_cache (trackId, provider, language, syncedLrc, plainText, " +
+                "provenanceUrl, fetchedAt, etag, matchConfidence) " +
                 "VALUES (?, 'builtin.lrclib', 'en', '[00:12.30] the slow tide', NULL, 'https://lrclib.net/x', 1600, NULL, 0.92)",
             arrayOf(trackA)
         )
         db.execSQL(
-            "INSERT INTO plugin_installations (id, version, manifestHash, enabled, approvedDomainJson, installOrigin, installedAt, manifestJson) " +
+            "INSERT INTO plugin_installations (id, version, manifestHash, enabled, approvedDomainJson, " +
+                "installOrigin, installedAt, manifestJson) " +
                 "VALUES ('com.example.demo', '1.0.0', 'hash', 1, 'api.audius.co,lrclib.net', 'file:///a.json', 1700, '{}')"
         )
         db.execSQL(
@@ -250,7 +255,11 @@ class MigrationTest {
     }
 
     /** Reads the file directly, so a failed Room open cannot hide what is actually on disk. */
-    private fun countRows(table: String): Int = ExportedSchema.read(databaseName, version = 1, sql = "SELECT COUNT(*) FROM `$table`") { cursor: Cursor ->
+    private fun countRows(table: String): Int = ExportedSchema.read(
+        databaseName,
+        version = 1,
+        sql = "SELECT COUNT(*) FROM `$table`"
+    ) { cursor: Cursor ->
         cursor.moveToFirst()
         cursor.getInt(0)
     }
