@@ -32,6 +32,18 @@ STATE/driver_runs/**
 # Python and editor temporary
 __pycache__/
 *.pyc
+.kotlin/
+
+# Local Gradle distribution downloads and crash diagnostics.
+# gradle-8.11.1-bin.zip was left at the kit root by an earlier session and is a 130 MB
+# download artefact, not a build input; heap dumps come from the JVM args in
+# gradle.properties. Both must never be committed.
+gradle-*-bin.zip
+*.hprof
+*.log
+
+# Gradle/Kotlin local build state left at the kit root by earlier sessions.
+.gradle-native/
 .DS_Store
 Thumbs.db
 *.swp

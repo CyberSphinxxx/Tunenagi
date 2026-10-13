@@ -89,9 +89,12 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0004\\20261013T080401Z-lint-and-assemble.json",
+        "STATE\\evidence\\TUN-0004\\TUN-0004-static-check-summary.txt"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-13T08:06:20+00:00; semantic review still required."
     },
     {
       "id": "TUN-0005",

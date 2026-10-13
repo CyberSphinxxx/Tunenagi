@@ -90,3 +90,73 @@ dropped and the phase 07 visual gate still applies.
 **Affected tasks**: TUN-0003, phases 02/03/04, phase 07 visual gate.
 
 **Owner review needed?** No - it changes when a control appears, not what the product does.
+
+## ADR-004 - Repository hygiene gates are project-local, self-tested, and check stored content (2026-10-13)
+
+**Context**: TUN-0004 owed "formatting/static checks and no secrets". The kit had neither:
+nothing enforced text hygiene, and nothing checked for credentials, although
+`SPEC/SECURITY_LEGAL.md` requires secret scanning and `SPEC/QUALITY_GATES.md` requires a
+lint/format layer and at least one negative test path.
+
+**Options**: (a) adopt ktlint/detekt now; (b) author project-local gates with self-tests
+alongside Android Lint; (c) rely on Android Lint alone.
+
+**Decision**: (b). Android Lint covers Android/Compose correctness (`:app:lintDebug`,
+`:core:lintDebug`). Two dependency-free scripts cover what it cannot see:
+`SCRIPTS/check_format.py` (F1-F5 text rules) and `SCRIPTS/secret_scan.py` (credentials in
+tracked content and in the whole commit history). ktlint/detekt is deferred to TUN-0005,
+where it can be pinned in the version catalog and run for every commit; adopting a
+formatter now would mean repository-wide auto-formatting inside a hygiene task.
+
+**Consequences**:
+- Both gates read the content git *stores*, not the working tree. A Windows checkout with
+  `core.autocrlf=true` legitimately has CRLF on disk while the index is LF, so
+  working-tree-based checks would fail every file and be ignored in practice. `git show
+  :<path>` resolves against the repository *root*, not the current directory: getting that
+  wrong made every read fail silently and looked exactly like a clean repository, so both
+  scripts now prepend the checkout prefix and warn if they read zero files.
+- Both gates ship a `--self-test` that proves they fail when they should: a gate that
+  cannot fail is not a gate.
+- `LENGTH_EXEMPT` in `check_format.py` waives the 140-character limit for four pre-existing
+  compact harness scripts and the generated Gradle wrapper. **The list may only shrink**;
+  adding to it changes a gate and therefore needs an independent audit.
+- Findings never print the secret they matched, only a redacted prefix.
+- `secret_scan.py` excludes itself, because its own pattern table would otherwise be
+  reported as the thing it detects.
+- These are new enforcement scripts, so `OPERATIONS/STATE_PROTOCOL.md` (self-change
+  restrictions) requires them to be covered by the phase-00 independent audit rather than
+  accepted on the author's word.
+- Lint: `ObsoleteSdkInt` is suppressed for `mipmap-anydpi-v26` in `app/lint.xml` because the
+  suggested merge breaks the build (AAPT2 cannot resolve the adaptive icon from a plain
+  `anydpi` folder; reproduced with a clean build). The Gradle/AGP "newer version available"
+  advisories are deliberately left visible, since ADR-001 pins versions on purpose.
+
+**Affected tasks**: TUN-0004 (this slice), TUN-0005 (CI must run these gates), phase-00 audit.
+
+**Owner review needed?** No for the mechanism; yes if the length waiver ever grows.
+
+## ADR-005 - Recovered the misplaced TUN-0001 artifacts and removed the stray root STATE (2026-10-13)
+
+**Context**: The 2026-10-11 session wrote `STATE/progress.md`,
+`STATE/preflight/TUN-0001-environment.md` and `STATE/preflight/TUN-0001_preflight_test.py`
+to a `STATE/` directory at the *repository root* while the kit - including
+`STATE/tasks.json` and all of TUN-0001's evidence - lives in `Tunenagi-Agent-Loop/`. The
+preflight document was therefore never committed, this log had no TUN-0001 entry, and the
+repository carried an untracked duplicate tree at the root.
+
+**Options**: (a) leave the stray directory and ignore it; (b) copy the artifacts into the
+kit, record the entry here, and remove the root copy; (c) move the kit to the root.
+
+**Decision**: (b). The root `STATE/` was a misplacement, not an alternative layout; the kit
+is the system of record and its `STATE/` is already tracked. TUN-0001's evidence manifests
+and `device-preflight.txt` are unaffected, so the verified status stands.
+
+**Consequences**: the preflight document and its test are now versioned and re-runnable from
+their canonical path (verified: the recovered test passes after the move). One over-long
+`print(...)` line was re-wrapped with identical output so the new format gate could stay
+uniform - the only content change. The repository root now contains only the kit checkout,
+`.git` and local tool state.
+
+**Affected tasks**: TUN-0001 (artifacts only, no status change), TUN-0004.
+
+**Owner review needed?** No - nothing was reworded or deleted that was not also preserved.

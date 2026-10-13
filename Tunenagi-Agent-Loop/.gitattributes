@@ -1,12 +1,28 @@
+# Tunenagi line-ending and diff policy — owned.
 #
-# https://help.github.com/articles/dealing-with-line-endings/
-#
-# Linux start script should use lf
+# The repository stores LF in the index for every text file. Without an explicit
+# attribute a Windows checkout with core.autocrlf=true flips files to CRLF on checkout,
+# which produces noise in diffs and the repeated "LF will be replaced by CRLF" warnings
+# this project was hitting on every add. Declaring the policy here makes the stored form
+# a property of the repository instead of a property of whoever cloned it.
+* text=auto eol=lf
+
+# Platform-specific scripts keep their own endings.
 /gradlew        text eol=lf
-
-# These are Windows script files and should use crlf
 *.bat           text eol=crlf
+*.cmd           text eol=crlf
 
-# Binary files should be left untouched
+# Binary assets are never normalised and never diffed as text.
 *.jar           binary
-
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.webp          binary
+*.ico           binary
+*.zip           binary
+*.apk           binary
+*.aab           binary
+*.keystore      binary
+*.jks           binary
+*.so            binary
+*.dex           binary
