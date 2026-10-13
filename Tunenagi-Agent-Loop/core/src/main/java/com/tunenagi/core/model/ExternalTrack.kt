@@ -70,6 +70,9 @@ data class ExternalTrack(
     val albumName: String? = null,
     val durationMs: Long? = null,
     val artworkUrl: String? = null,
+    /** Reporting identifiers, when the provider gives them. They make a match verifiable. */
+    val isrc: String? = null,
+    val mbid: String? = null,
     /** What the provider says about playability, when it says anything at all. */
     val availability: SourceAvailability = SourceAvailability.Unknown,
     /** True when the provider served the row itself, which the UI shows as attribution. */
@@ -82,6 +85,8 @@ data class ExternalTrack(
         require(durationMs == null || durationMs > 0) {
             "ExternalTrack duration must be positive when known, but was $durationMs"
         }
+        require(isrc == null || isrc.isNotBlank()) { "ExternalTrack isrc must not be blank when present" }
+        require(mbid == null || mbid.isNotBlank()) { "ExternalTrack mbid must not be blank when present" }
     }
 
     /** The identity used to detect a duplicate of this provider row. */

@@ -164,9 +164,11 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0101\\20261013T195511Z-domain-model-tests.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-13T19:55:30+00:00; semantic review still required."
     },
     {
       "id": "TUN-0102",
@@ -185,9 +187,11 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0102\\20261013T200423Z-room-schema-and-dao-tests.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-13T20:05:03+00:00; semantic review still required."
     },
     {
       "id": "TUN-0103",
@@ -206,9 +210,11 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0103\\20261013T201100Z-migration-and-dao-tests.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-13T20:12:04+00:00; semantic review still required."
     },
     {
       "id": "TUN-0104",
@@ -228,9 +234,11 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0104\\20261013T201646Z-matching-and-lock-tests.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-13T20:32:29+00:00; semantic review still required."
     },
     {
       "id": "TUN-0105",
@@ -249,9 +257,11 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0105\\20261013T202231Z-queue-repository-tests.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-13T20:25:58+00:00; semantic review still required."
     },
     {
       "id": "TUN-0106",
@@ -270,9 +280,11 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0106\\20261013T202514Z-library-repository-tests.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-13T20:26:02+00:00; semantic review still required."
     },
     {
       "id": "TUN-0107",
