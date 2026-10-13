@@ -114,9 +114,12 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0005\\20261013T083748Z-verify-all.json",
+        "STATE\\evidence\\TUN-0005\\TUN-0005-ci-and-verification-summary.txt"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-13T08:39:25+00:00; semantic review still required."
     },
     {
       "id": "TUN-0006",

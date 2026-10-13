@@ -1,0 +1,102 @@
+# Tunenagi CI — owned.
+#
+# Every command below is also a step of `SCRIPTS/verify.py`, and
+# `SCRIPTS/check_ci.py` fails if the two ever disagree. That is deliberate: a workflow that
+# runs something a contributor cannot run locally makes "it passed CI" unfalsifiable.
+# Run `python SCRIPTS/check_ci.py` after editing this file.
+#
+# Action pins are majors verified against the projects' release pages; the node20-era v4
+# pins are deprecated and are rejected by the checker:
+#   actions/checkout@v7        https://github.com/actions/checkout/releases
+#   actions/setup-java@v6      https://github.com/actions/setup-java/releases
+#   gradle/actions/setup-gradle@v6   https://github.com/gradle/actions/releases
+#
+# The runner is pinned to ubuntu-24.04 rather than ubuntu-latest: the latest label moves to
+# Ubuntu 26.04 during the October-November 2026 migration, and the image already provides the
+# Android SDK (ANDROID_HOME/ANDROID_SDK_ROOT) that AGP needs, so no SDK setup action is used.
+#
+# No job contacts Audius, LRCLIB or MusicBrainz. Provider smoke tests are manual, rate-limited
+# and owner-approved work, never something CI repeats on every push.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    name: Hygiene gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        # The kit lives in a subdirectory of this repository, so every relative command
+        # below would otherwise run in the wrong directory. check_ci.py enforces this.
+        working-directory: Tunenagi-Agent-Loop
+    steps:
+      - name: Check out the full history
+        uses: actions/checkout@v7
+        with:
+          # The secret scan reads every commit, so a shallow clone would weaken it silently.
+          fetch-depth: 0
+
+      - name: Harness structure and task graph
+        run: python SCRIPTS/validate_package.py
+
+      - name: Formatting gate
+        run: python SCRIPTS/check_format.py
+
+      - name: Secret scan
+        run: python SCRIPTS/secret_scan.py --history
+
+      - name: CI definition check
+        run: python SCRIPTS/check_ci.py
+
+  android:
+    name: Build, unit tests and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: hygiene
+    defaults:
+      run:
+        working-directory: Tunenagi-Agent-Loop
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          # AGP 8.7.x documents JDK 17 as its default; this project supports 17-21.
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          # Basic caching is the open-source (MIT) provider, which suits a GPL project;
+          # the default enhanced cache is a proprietary component. Gradle caching is not
+          # also enabled in setup-java above, because the two mechanisms interfere.
+          cache-provider: basic
+
+      - name: JVM unit tests
+        run: bash gradlew :core:testDebugUnitTest
+
+      - name: Assemble debug APK
+        run: bash gradlew :app:assembleDebug
+
+      - name: Android Lint
+        run: bash gradlew :app:lintDebug :core:lintDebug
+
+      - name: Lint findings stay inside the accepted baseline
+        run: python SCRIPTS/check_lint.py

@@ -65,16 +65,23 @@ command rather than writing a new global configuration.
 
 Run from the kit root (`Tunenagi-Agent-Loop/`):
 
+    python SCRIPTS/verify.py        # every step below, one verdict
+    python SCRIPTS/verify.py --fast # the steps that need no JDK
+
+`SCRIPTS/verify.py` finds a JDK in the supported range and exports `JAVA_HOME` itself, which
+removes the trap that cost two sessions: Kotlin 2.0.20 cannot parse JDK 25, so a plain
+`bash gradlew` fails with `IllegalArgumentException: 25.0.1` before any project code runs
+(see `STATE/blockers.md`). CI runs exactly the same commands — see
+`OPERATIONS/CI_AND_VERIFICATION.md`. Individual steps, when one at a time is more useful:
+
+    python SCRIPTS/validate_package.py      # harness structure and task graph
     python SCRIPTS/check_format.py          # F1-F5 text rules over stored content
     python SCRIPTS/secret_scan.py --history # credentials in tracked files and in history
+    python SCRIPTS/check_ci.py              # CI definition matches local commands
+    python SCRIPTS/check_lint.py            # lint findings inside the accepted baseline
     python SCRIPTS/taskctl.py status        # task/defect/gate state
-
-and for this Android project (`JAVA_HOME` must point at JDK 17-21; Kotlin 2.0.20 cannot
-parse JDK 25, see `STATE/blockers.md`):
-
-    JAVA_HOME=<jdk-21> bash gradlew :core:testDebugUnitTest
-    JAVA_HOME=<jdk-21> bash gradlew :app:assembleDebug :app:assembleDebugAndroidTest
-    JAVA_HOME=<jdk-21> bash gradlew :app:lintDebug :core:lintDebug
+    JAVA_HOME=<jdk-21> bash gradlew :core:testDebugUnitTest :app:assembleDebug \
+        :app:assembleDebugAndroidTest :app:lintDebug :core:lintDebug
 
 Real check runs are captured with `SCRIPTS/run_check.py`, which writes the command,
 working directory, exit code and log into `STATE/evidence/<TASK>/`.
@@ -109,6 +116,11 @@ Two independent layers, both real and both runnable without a device:
   `gradle/libs.versions.toml` and version moves are owner-reviewed, so the advisory is
   information rather than a defect. They are not suppressed, because a stale pin should
   stay visible.
+
+That baseline is enforced, not just documented: `SCRIPTS/check_lint.py` fails on any lint
+error and on any warning class outside the list above, so a new defect of the same kind as
+the `ModifierParameter` one cannot slip through CI unnoticed. Adding an accepted class means
+editing that script's baseline, which is a gate change.
 - `ObsoleteSdkInt` for `mipmap-anydpi-v26`, suppressed with evidence in `app/lint.xml`:
   the suggested merge breaks AAPT2 resource linking (reproduced with a clean build).
 

@@ -160,3 +160,54 @@ uniform - the only content change. The repository root now contains only the kit
 **Affected tasks**: TUN-0001 (artifacts only, no status change), TUN-0004.
 
 **Owner review needed?** No - nothing was reworded or deleted that was not also preserved.
+
+## ADR-006 - CI is a thin mirror of one local verification entry point (2026-10-13)
+
+**Context**: TUN-0005 owed CI build/lint/unit jobs, reproducible local commands and "no
+remote source smoke spam". Three facts shaped the design: GitHub Actions cannot be executed
+on this machine, so a workflow cannot be proven to work here; the kit is a *subdirectory* of
+the repository (`Tunenagi-Agent-Loop/`), so every relative command is one directory away from
+where Actions starts; and Android Lint only fails a build on errors, so the warning classes
+fixed at TUN-0004 could silently return.
+
+**Options**: (a) hand-write the workflow and validate it with a project-local checker;
+(b) generate the workflow from a data structure; (c) adopt external CI linters (actionlint)
+and accept the extra binary dependency.
+
+**Decision**: (a). `SCRIPTS/verify.py` is the single local entry point (eight steps, one
+verdict, JDK auto-discovery). `.github/workflows/ci.yml` runs the *same* commands, and
+`SCRIPTS/check_ci.py` fails (rule C4) if any command in the workflow is not a `verify.py`
+step — it imports the step list rather than duplicating it, so the two cannot drift. The
+checker also enforces the pins (C1), the runner image (C2), single-line commands (C3), no
+provider host (C5), full-history checkout for the secret scan (C6), read-only permissions
+and no secrets (C7), and the working directory (C8). `SCRIPTS/check_lint.py` turns the
+documented lint baseline into an enforced one.
+
+**Consequences**:
+- Action pins were verified against the projects' release pages instead of memory:
+  `actions/checkout@v7`, `actions/setup-java@v6`, `gradle/actions/setup-gradle@v6`. The
+  node20-era `@v4` pins are deprecated and their runtime was removed from runners
+  (2026-09-23), so they are on an explicit rejected list. Tags are still movable, so SHA
+  pinning remains available as later hardening.
+- `runs-on: ubuntu-24.04` is pinned instead of `ubuntu-latest`, because the `latest` label
+  migrates to Ubuntu 26.04 during October-November 2026 and the 24.04 x64 image already
+  ships the Android SDK, so no SDK setup action is needed.
+- `cache-provider: basic` is used for Gradle caching: the open-source (MIT) provider, rather
+  than the proprietary enhanced cache, which suits this project's licence direction.
+- CI never contacts Audius, LRCLIB or MusicBrainz and uses no secrets. Live provider smoke
+  tests stay manual, rate-limited and owner-approved.
+- **Residual risk, stated rather than hidden**: the first real Actions run happens on push,
+  which is an owner action, so the claim is "the definition is consistent and every command
+  passes locally", never "CI is green". `OPERATIONS/CI_AND_VERIFICATION.md` says so.
+- A green CI proves nothing about device behaviour: TUN-0003's device evidence is still
+  outstanding and TUN-0006 owns the first device record.
+- `gradlew` was tracked without the executable bit (100644); fixed to 100755, otherwise
+  `./gradlew` fails on Linux runners and contributors' machines alike.
+- As with TUN-0004, the new gate scripts are enforcement code and need independent audit
+  coverage at the phase-00 audit.
+
+**Affected tasks**: TUN-0005 (this slice), TUN-0006 (runs the same commands on a device),
+phase-00 audit, TUN-0009 (release CI).
+
+**Owner review needed?** No for the mechanism. Yes before the first push, which is what
+actually executes this pipeline.

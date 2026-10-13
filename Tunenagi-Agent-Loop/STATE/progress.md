@@ -178,3 +178,49 @@ below is the original entry's content.
 - **Next exact action**: TUN-0005 (CI build and local verification commands) is next once
   TUN-0004 is verified; it must call `check_format.py`, `secret_scan.py` and the Gradle
   lint/test tasks. Phase 00 then needs its independent audit.
+
+## 2026-10-13T08:40Z - deepseek-v4-flash session (TUN-0005)
+
+- **Phase/task**: Phase 00 / TUN-0005 "CI build and local verification commands" - claimed,
+  implemented, command evidence captured. Device: not applicable (`evidenceKinds: [command]`).
+- **Summary/change paths**: added the CI pipeline and one local entry point that mirrors it.
+  New: `.github/workflows/ci.yml` (hygiene + android jobs), `SCRIPTS/verify.py` (eight steps,
+  one verdict, JDK discovery), `SCRIPTS/check_ci.py` (CI definition rules C1-C8),
+  `SCRIPTS/check_lint.py` (lint baseline gate), `OPERATIONS/CI_AND_VERIFICATION.md`.
+  Changed: `OPERATIONS/GIT_CONVENTIONS.md` (verify.py first, enforced lint baseline),
+  `gradlew` file mode 100644 -> 100755.
+- **Commands and exit codes (evidence paths)**, all under `STATE/evidence/TUN-0005/`:
+  - `python SCRIPTS/verify.py` -> exit 0, `VERDICT: PASS - 8 step(s) green`
+    (`20261013T083748Z-verify-all.json`). An earlier run failed with exit 2
+    (`20261013T083421Z-verify-all.json`) and is kept: it is the record of three defects in
+    `verify.py` that the run itself exposed (below).
+  - `python SCRIPTS/verify.py --self-test` -> exit 0 (`20261013T083809Z-verify-selftest.json`).
+  - `python SCRIPTS/check_ci.py --self-test` -> exit 0 (`20261013T083809Z-ci-check-selftest.json`).
+  - `python SCRIPTS/check_lint.py --self-test` -> exit 0 (`20261013T083446Z-lint-gate-selftest.json`).
+  - Sanitized summary artifact: `TUN-0005-ci-and-verification-summary.txt`.
+- **Defects the first verify run exposed (all fixed, each with a self-test assertion now)**:
+  1. the `assemble` step was missing `needs_java=True`, so it ran under the host's JDK 25 and
+     failed with `IllegalArgumentException: 25.0.1`; the self-test now asserts that every
+     Gradle step declares its JDK need;
+  2. skipped steps were counted as failures, conflating "could not run" with "failed" -
+     `skipped` and `failed` are now computed separately and the verdict distinguishes FAIL
+     from INCOMPLETE;
+  3. the JDK search missed a JDK extracted into a versioned subdirectory
+     (`C:/Users/CyberSphinx/jdk-21/jdk-21.0.12.1+1`), which is why the first run fell back to
+     JDK 25.
+  Two further bugs were found in `check_ci.py` by its own self-test: a greedy `\s*` after `run:`
+  captured the *following* line (so comments were treated as commands), and `uses:` detection
+  missed list-item form, which let a deprecated pin pass.
+- **CI verification result**: `python SCRIPTS/check_ci.py` passes on the real workflow -
+  verified action pins, only locally-runnable commands, no provider host, full-history
+  checkout, `contents: read`, no secrets, explicit working directory.
+- **Device / emulator observations**: none; this task has no device evidence kind. TUN-0003's
+  runtime blocker in `STATE/blockers.md` is unchanged.
+- **Commit SHA**: recorded in the follow-up commit to this log.
+- **Blockers or risks**: CI has never executed - the first run happens on push, which is an
+  owner action, and `OPERATIONS/CI_AND_VERIFICATION.md` states that as residual risk rather
+  than implying a green pipeline. The new gate scripts need phase-00 audit coverage. ktlint
+  adoption is still open (the F1-F5 gate covers formatting meanwhile).
+- **Next exact action**: phase 00 has TUN-0003 (device evidence, blocked) and TUN-0006 (first
+  device record, depends on TUN-0003 and TUN-0005) left; TUN-0006 cannot start before TUN-0003
+  produces a runtime. Otherwise the phase-00 independent audit is the remaining gate.
