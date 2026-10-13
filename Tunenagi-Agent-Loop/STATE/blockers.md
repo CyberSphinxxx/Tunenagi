@@ -29,6 +29,10 @@ missing.
 - `-qemu -accel tcg` and `-qemu -cpu qemu64` crash the frontend with SIGSEGV (exit 139).
 - An ARM64 system image is refused by the emulator's QEMU2 launcher on an x86_64 host, so it is
   not an alternative here.
+- The device step itself is wired correctly, so the runtime is the only missing input: run
+  with JDK 21 and no device attached, `:app:connectedDebugAndroidTest` builds the test APK
+  (`:app:packageDebugAndroidTest` executes) and then fails only with `DeviceException: No
+  connected devices!` - exit 1, evidence `STATE/evidence/TUN-0003/20261013T190507Z-connected-android-test-preflight.json`.
 
 **Attempts:** 1. (2026-10-12) elevated `silent_install.bat` through the approved-elevation flow
 -> the UAC prompt was cancelled, nothing ran. 2. (2026-10-13T18:19Z) the same flow with

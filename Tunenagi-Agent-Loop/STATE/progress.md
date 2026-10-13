@@ -259,3 +259,19 @@ below is the original entry's content.
 - **Next exact action**: with a runtime available, run the four-step procedure in
   `OPERATIONS/EMULATOR_RUNTIME.md` (instrumented tests, install/launch, screenshots, then
   `taskctl verify TUN-0003 --artifact device-*.png`), then TUN-0006, then the phase-00 audit.
+
+### 2026-10-13T19:07Z - addendum: the device step is wired, only the runtime is missing
+
+- **Commands and exit codes**: `JAVA_HOME=<jdk-21> bash gradlew :app:connectedDebugAndroidTest`
+  with no runtime -> exit 1, `DeviceException: No connected devices!`, after
+  `:app:packageDebugAndroidTest` built the instrumentation APK. Evidence (a failing manifest,
+  kept deliberately): `STATE/evidence/TUN-0003/20261013T190507Z-connected-android-test-preflight.json`. This is the honest form of the TUN-0003 claim: the
+  implementation and its test APK are correct, and only the device is absent.
+- **Summary/change paths**: recorded in `STATE/blockers.md` and
+  `OPERATIONS/EMULATOR_RUNTIME.md`. `SCRIPTS/device_evidence.py` (preceding commit) now turns the
+  device step into one command; its self-test passes, four injected mutations are caught, and
+  `--preflight` plus the accelerator guard both exit 2 without writing any artifact or touching
+  the task status.
+- **Next exact action**: unchanged - install AEHD from an elevated console
+  (`silent_install_safe.bat`) or attach a device, then
+  `python SCRIPTS/device_evidence.py --task TUN-0003 --avd tunenagi_api33`.

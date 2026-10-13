@@ -185,6 +185,21 @@ The manual equivalent, if the script is unavailable for some reason:
         --evidence STATE/evidence/TUN-0003/<manifest>.json \
         --artifact STATE/evidence/TUN-0003/device-home.png
 
+### Wiring check: the device step needs only the runtime
+
+Verified once, without any runtime, on 2026-10-13T19:07Z:
+
+    JAVA_HOME=<jdk-21> bash gradlew :app:connectedDebugAndroidTest     # exit 1
+    > Task :app:packageDebugAndroidTest
+    > Task :app:connectedDebugAndroidTest FAILED
+    > com.android.builder.testing.api.DeviceException: No connected devices!
+
+The test APK builds and the task fails only on the absent device, so nothing about the test
+configuration, the instrumentation runner or the JDK is outstanding. The single unavailable
+input is the runtime itself. Evidence:
+`STATE/evidence/TUN-0003/20261013T190507Z-connected-android-test-preflight.json` (exit 1).
+
+
 ## What this document is not
 
 - It is not evidence that any device test passed. No `device-` artifact exists yet, which is
