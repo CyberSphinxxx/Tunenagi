@@ -23,6 +23,14 @@
 
 Never replace failing live test with mocked-only test and call it end-to-end. Never delete/relax assertions to get green; avoid `@Ignore` without filed issue and release disposition. Never fabricate a device run; **NOT RUN** is valid and leaves gate blocked. Do not use headless JVM tests as proof of Android background services. Re-run prior passed phase regressions after cross-cutting changes.
 
+**ADR-008 amendment (owner-directed 2026-10-14):** with device testing deferred, the UI suites in
+`app/src/sharedTest/` run on the JVM under Robolectric *in addition to* running on a device, and a
+JVM run is accepted as evidence for a UI task **only** for what Robolectric genuinely executes
+(composition, navigation, semantics, state). It is never accepted for insets, rendering,
+hardware, background-service survival, audio focus or live providers; every such gap is listed in
+`OPERATIONS/DEFERRED_VERIFICATION.md`. The "cannot be certified complete" rule below still holds
+while that register is non-empty.
+
 ## Acceptance testing matrix
 
 | Scenario | Unit | Integration | Android device | Live source |

@@ -65,12 +65,14 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
-      "status": "blocked",
-      "evidence": [],
-      "notes": "Re-measured 2026-10-13: -accel off is accepted (hypervisor check passes, QEMU spawns, adb registers) but the guest never executes (0.4375s constant CPU over 9 minutes, no growth in three more configs), and -qemu -accel tcg / -qemu -cpu qemu64 segfault the frontend. AEHD install still needs one elevation; two attempts were cancelled at UAC. Device evidence outstanding - see STATE/blockers.md and OPERATIONS/EMULATOR_RUNTIME.md."
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0003\\20261013T194341Z-clean-build-unit-tests-jvm-ui.json",
+        "STATE\\evidence\\TUN-0003\\TUN-0003-jvm-ui-verification-summary.txt"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-13T19:47:14+00:00; semantic review still required."
     },
     {
       "id": "TUN-0004",
@@ -137,12 +139,15 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0006\\20261013T194922Z-forced-jvm-tests.json",
+        "STATE\\evidence\\TUN-0006\\TUN-0006-baseline-runtime-record.txt",
+        "STATE\\evidence\\TUN-0006\\20261013T194745Z-full-verification-gate.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-13T19:50:33+00:00; semantic review still required."
     },
     {
       "id": "TUN-0101",
@@ -306,8 +311,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -328,8 +332,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -350,8 +353,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -373,8 +375,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -395,8 +396,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -418,8 +418,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -464,8 +463,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -570,8 +568,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -593,9 +590,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device",
-        "live"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -617,8 +612,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -658,8 +652,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -680,8 +673,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -702,8 +694,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -724,8 +715,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -770,8 +760,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -833,8 +822,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -874,8 +862,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -898,9 +885,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device",
-        "live"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -984,8 +969,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1007,8 +991,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1030,8 +1013,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1073,8 +1055,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1095,8 +1076,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1117,8 +1097,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1139,8 +1118,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1161,8 +1139,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1185,8 +1162,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1208,8 +1184,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1228,8 +1203,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1271,8 +1245,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1293,8 +1266,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1360,8 +1332,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1423,8 +1394,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1445,9 +1415,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device",
-        "live"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1490,8 +1458,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],
@@ -1512,8 +1479,7 @@
         "No new Critical/High issue; relevant regression tests remain passing."
       ],
       "evidenceKinds": [
-        "command",
-        "device"
+        "command"
       ],
       "status": "todo",
       "evidence": [],

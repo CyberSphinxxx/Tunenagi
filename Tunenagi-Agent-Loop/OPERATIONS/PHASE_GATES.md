@@ -22,3 +22,5 @@ At the end of every later phase rerun fast unit + build + lint and core playback
 ### Gate / audit distinction
 
 `taskctl.py gate` is a **metadata checker** only. It cannot verify screenshots, Android state or actual quality. A separate auditor must inspect source and evidence and write a PASS report. Release requires both. If no device present, relevant phase remains BLOCKED rather than marking pass from mocks.
+
+**Amendment (ADR-008, owner-directed 2026-10-14):** the owner has directed that the build continue without Android device testing, so the sentence above is honoured in a specific way rather than suspended. A phase is audited on its machine-verifiable evidence, the auditor states in the report which mandatory proof was unavailable, and the missing proof is added to `OPERATIONS/DEFERRED_VERIFICATION.md`. No phase may be called complete on a device or live requirement it did not test, and the release gates at the end of the project still require the register to be empty or explicitly accepted by the owner.

@@ -251,3 +251,60 @@ the phase-00 audit and every later phase.
 
 **Owner review needed?** Yes - the runtime decision is the owner's, and installing a kernel
 driver is a system-level change this project must not make unasked.
+
+## ADR-008 - Owner defers on-device verification; JVM-hosted Android tests carry the load (2026-10-14)
+
+**Context**: ADR-007 kept TUN-0003 `blocked` because its contract demanded `device` evidence and
+no Android runtime exists on this host (no device attached; the emulator cannot execute a guest
+without hypervisor acceleration, measured in `OPERATIONS/EMULATOR_RUNTIME.md`; the driver install
+needs one UAC elevation that has been cancelled twice). Every later phase is gated behind the
+phase-00 audit, which is gated behind all six phase-00 tasks being verified, so the whole
+backlog - 63 remaining P0 tasks - was frozen on one prompt nobody could click.
+
+**Options**: (a) keep everything frozen until a runtime appears; (b) mark device tasks verified
+on command evidence alone and say nothing further; (c) owner-directed: continue the build
+without device testing, record the deferral precisely, and substitute the strongest
+*non-device* verification that genuinely exercises the same code.
+
+**Decision**: (c), on the owner's explicit instruction ("continue until everything is finished,
+no need to test in android"). Two mechanisms, discovered and implemented together:
+
+1. `evidenceKinds` is reduced to `command` on the 38 tasks that required `device`/`live`
+   artifacts. No task, dependency, deliverable or acceptance sentence is removed; what changes is
+   which artifact `taskctl verify` demands.
+2. The substitute is real, not rhetorical: the Compose shell suite now lives in
+   `app/src/sharedTest/` and runs **twice** from one source - on the JVM under Robolectric
+   (`:app:testDebugUnitTest`, no device needed) and as an instrumented test on a device
+   (`:app:connectedDebugAndroidTest`). `AndroidJUnit4` is the delegating runner that makes the
+   single source possible. Robolectric executes the real Android framework, resources, Compose
+   runtime and navigation graph; only the device-specific surface is missing.
+
+**Consequences**:
+- The substitute immediately earned its place: the first JVM execution failed on a real defect
+  the finished-but-never-run device test had never detected. BUG-0001 - the compact shell mounted
+  the mini-player twice, reserving the bar's height twice and leaving two identical clickable
+  nodes - is filed, fixed and closed with retest evidence. That is a user-visible layout defect
+  found by *adding* verification, not by lowering a bar.
+- `OPERATIONS/DEFERRED_VERIFICATION.md` is a standing register of the proof that is now missing:
+  install/launch/insets/OEM/audio-focus/lockscreen behaviour, live Audius/LRCLIB/MusicBrainz
+  calls, owner-held release keys, GitHub Actions execution and every device performance number.
+  It states the rule later sessions must not drift from: no JVM test may stand in for a
+  deliverable that says "on device" or "live", no `device-*`/`live-*` artifact may be
+  fabricated, and the absence is the record.
+- `SPEC/QUALITY_GATES.md`'s "if Android SDK/emulator unavailable, build cannot be certified
+  complete" is left standing. This project is explicitly **not certifiable complete** while the
+  register is non-empty; what the owner permitted is continuing to build and to audit the
+  machine-verifiable half truthfully.
+- Severity discipline is unchanged: defects are still filed with real reproductions, phase audits
+  still re-run the evidence, and a Critical/High finding still invalidates audits from that phase
+  onwards.
+- Cost accepted knowingly: a JVM-hosted test cannot see system bars, cutouts, insets, GPU
+  rasterisation, input latency, TalkBack, OEM task-killing or real codecs. Anything that depends
+  on those is deferred, not verified.
+
+**Affected tasks**: TUN-0003, TUN-0006, every task that required `device` or `live` evidence, the
+phase-00 audit and all later phase gates.
+
+**Owner review needed?** Already given, and needed again before release: the deferral must be
+closed - the register emptied, or its residue explicitly accepted - before the project can claim
+anything about a working app on a phone.
