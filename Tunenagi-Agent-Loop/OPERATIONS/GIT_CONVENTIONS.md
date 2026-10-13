@@ -131,3 +131,17 @@ icons need a `<monochrome>` layer for Android 13 themed icons).
 Adopting ktlint/detekt with repository-wide auto-formatting remains open and belongs to
 TUN-0005 (CI), where it can be pinned in the version catalog and run for every commit
 rather than only locally.
+
+## Device evidence for `device` tasks
+
+`device` evidence cannot be produced without a runtime, and it is never simulated. The procedure
+in `OPERATIONS/EMULATOR_RUNTIME.md` is executable:
+
+    python SCRIPTS/device_evidence.py --task TUN-0003   # full run, ends in taskctl verify
+    python SCRIPTS/device_evidence.py --preflight       # report the runtime, change nothing
+    python SCRIPTS/device_evidence.py --self-test       # pure-logic checks, needs no device
+
+It refuses to boot an emulator without a working accelerator, because the measured
+software-emulation path starts a guest that never executes, and it deletes any screenshot that is
+not real PNG data rather than keeping a placeholder. A failed run leaves the task status
+untouched, so a red device run can never look like a green one.
