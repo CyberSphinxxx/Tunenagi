@@ -275,3 +275,61 @@ below is the original entry's content.
 - **Next exact action**: unchanged - install AEHD from an elevated console
   (`silent_install_safe.bat`) or attach a device, then
   `python SCRIPTS/device_evidence.py --task TUN-0003 --avd tunenagi_api33`.
+
+## 2026-10-14T04:00Z - Codebuff session (phase 00 completion and phase 01)
+
+- **Phase/tasks**: phase 00 audited and certified (TUN-0003, TUN-0006 verified on this session's
+  evidence); phase 01 all seven tasks implemented and verified.
+- **Owner decision (ADR-008)**: "continue until everything is finished, no need to test in android".
+  `evidenceKinds` reduced to `command` on the 38 tasks that required `device`/`live`; the missing
+  proof is enumerated in `OPERATIONS/DEFERRED_VERIFICATION.md` and the release gates still require it
+  to be closed. The substitute is real: `app/src/sharedTest` Compose tests run on the JVM under
+  Robolectric *and* as instrumented tests from one source, and its first JVM run found BUG-0001 (the
+  compact shell mounted the mini-player twice). `verify.py` and CI now run `:app:testDebugUnitTest`,
+  which they would not have done otherwise.
+- **Phase 01**: domain vocabulary (TUN-0101), Room schema v1 + 43 constraint tests (TUN-0102), an
+  explicit v1->v2 migration proven against a database rebuilt from version 1's own exported DDL
+  (TUN-0103), conservative source matching with persisted manual locks (TUN-0104), queue persistence
+  with a deterministic seeded shuffle (TUN-0105), atomic playlist/favourite/history repositories
+  (TUN-0106), and the enforced dependency-direction gate (TUN-0107).
+- **Defects found and closed**: BUG-0001 (Medium, duplicate mini-player), BUG-0002 (Low, no test for
+  the "source disappears" trap - found by the phase-01 audit, fixed, retested).
+- **Commands and exit codes (evidence paths)**: `bash gradlew clean :core:testDebugUnitTest
+  :app:testDebugUnitTest :app:assembleDebug --no-build-cache` -> exit 0, 94 tasks;
+  `python SCRIPTS/verify.py` -> VERDICT: PASS, 9/9 steps. 151 JVM tests (core 143, app 8), 0 failures.
+  Manifests under `STATE/evidence/TUN-0003`, `TUN-0006`, `TUN-0101`..`TUN-0107`.
+- **Device / emulator observations**: none and none possible - no device attached, `emulator-check
+  accel` exits 6 (hypervisor driver absent). Recorded, not worked around (ADR-008).
+- **Blockers or risks**: the deferral in `OPERATIONS/DEFERRED_VERIFICATION.md` is the main risk:
+  nothing is proven on real hardware, no provider has ever been contacted, and CI has never run.
+- **Next exact action**: audit phase 01, then phase 02 (Media3 service and local playback), whose
+  device half is deferred under ADR-008.
+
+## 2026-10-14T04:20Z - Codebuff session (phase 01 audit)
+
+- **Phase/tasks**: phase 01 audited. `STATE/audits/phase-01-20261014-0415.md` written; the
+  machine-check certificate is `STATE/audits/phase-01-pass.json` (`taskctl.py audit 01`, exit 0).
+- **Independence limitation, stated in the report**: the same agent implemented the phase and audited
+  it. The mitigation is that the audit re-ran every gate from the artifacts instead of trusting the
+  task runs, and it did not come back clean - it found a real gap and a red gate (below). A separate
+  reviewer must still re-run the commands before release.
+- **What the audit checked that the task runs had not**:
+  - every table's primary key in the exported schema, against the named trap "provider ID used as PK"
+    (no external id, provider id, MBID, ISRC or URI is a primary key anywhere);
+  - `python SCRIPTS/check_format.py` - **exit 2, 14 findings** that no task had run: 12 code lines
+    over 140 characters and 2 Room-exported schema files with no final newline. Fixed; the generated
+    export directory is now excluded by path rather than content (ADR-010), and the self-test still
+    catches tabs, trailing whitespace, missing newlines, CRLF and long lines;
+  - the named trap "accidental deletion after source loss" - **not covered** by any test. BUG-0002
+    filed and closed with `DatabaseConstraintTest.deletingASourceLeavesTheTrackCreditsAndPlaylistsIntact`;
+  - every evidence manifest's `sha256` recomputed: 59 manifests, all hashes match (the nonzero exits
+    among them are the retained failing attempts, kept rather than deleted).
+- **Commands and exit codes (evidence paths)**: `python SCRIPTS/verify.py` -> exit 0, 9/9 steps;
+  `python SCRIPTS/check_format.py` -> 2 then 0; `python SCRIPTS/check_boundaries.py --self-test` ->
+  exit 0 with all six injected violations caught; `taskctl.py audit 01` -> exit 0.
+- **Device / emulator observations**: none and none possible (no device, no hypervisor driver). The
+  audit says so explicitly rather than implying device proof, per ADR-008.
+- **Blockers or risks**: the same deferral as before, plus one honest note - the audit's own trap
+  coverage is now asserted by tests, but only the checks listed above were re-derived independently.
+- **Next exact action**: phase 02 - the Media3 playback service and local playback path
+  (`python SCRIPTS/taskctl.py next` to confirm eligibility).

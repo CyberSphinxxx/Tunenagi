@@ -127,6 +127,38 @@ class DatabaseConstraintTest {
         assertEquals("the album belongs to the library, not to the track", 1, countAlbums())
     }
 
+    /**
+     * The named trap of phase 01: "accidental deletion after source loss". A source that is removed
+     * (a file deleted, a creator restricting a track) must take nothing with it - not the track, not
+     * its credit, not its place in a playlist. Only the availability of the source changes, and this
+     * test removes the row entirely to prove the foreign keys point the other way.
+     */
+    @Test
+    fun deletingASourceLeavesTheTrackCreditsAndPlaylistsIntact() = runBlocking {
+        val playlist = Fixtures.playlist()
+        db.playlistDao().insertPlaylist(TunenagiMappers.toPlaylistEntity(playlist))
+        val artist = Fixtures.artist()
+        db.artistDao().insert(TunenagiMappers.toArtistEntity(artist))
+
+        val trackId = TrackId.random()
+        db.trackDao().insert(TunenagiMappers.toTrackEntity(Fixtures.track(trackId), Fixtures.now, Fixtures.now))
+        db.trackCreditDao().insert(TunenagiMappers.toTrackArtistEntity(Fixtures.credit(trackId, artist.id)))
+        val source = Fixtures.source(trackId)
+        db.sourceDao().insert(TunenagiMappers.toTrackSourceEntity(source))
+        db.playlistDao().insertEntry(
+            TunenagiMappers.toPlaylistEntryEntity(Fixtures.entry(playlist.id, trackId, position = 0))
+        )
+        db.favoriteDao().upsert(TunenagiMappers.toFavoriteEntity(Favorite(trackId, Fixtures.now)))
+
+        assertEquals(1, db.sourceDao().delete(source.id.value))
+
+        assertNotNull("the track survives its source", db.trackDao().byId(trackId.value))
+        assertEquals(0, db.sourceDao().countForTrack(trackId.value))
+        assertEquals(1, db.trackCreditDao().forTrack(trackId.value).size)
+        assertEquals(1, db.playlistDao().entryCount(playlist.id.value))
+        assertTrue("a favourite is about the track, not the source", db.favoriteDao().isFavorite(trackId.value))
+    }
+
     @Test
     fun deletingAnAlbumClearsTheReferenceOnItsTracks() = runBlocking {
         val album = Fixtures.album()

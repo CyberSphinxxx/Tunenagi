@@ -13,6 +13,19 @@
       "resolution": "Fixed in TunenagiShell.kt: the layout now mounts exactly one MiniPlayerHost per layout (compact: inside the bottom-bar Column above the navigation bar; wide: closing the content column), with the decision hoisted into miniPlayerVisible/layout so the two call sites cannot disagree again. Retest: :app:testDebugUnitTest --rerun-tasks rebuilt and ran the shell suite on the JVM, exit 0, 8 tests / 0 failures, including two new regression tests asserting exactly one 'mini-player' and one navigation container node in each layout.",
       "evidence": "STATE\\evidence\\TUN-0003\\20261013T194215Z-jvm-android-ui-suite.json",
       "closedUtc": "2026-10-13T19:43:29+00:00"
+    },
+    {
+      "id": "BUG-0002",
+      "phase": "01",
+      "relatedTask": "TUN-0102",
+      "severity": "Low",
+      "status": "closed",
+      "title": "Source loss is not covered by a deletes-a-source test",
+      "reproduction": "SPEC/DATA_MODEL.md: 'source can disappear without deleting Track/PlaylistEntry'. The phase-01 trap list names 'accidental deletion after source loss'. Phase 01 asserts the opposite direction (DatabaseConstraintTest.deletingATrackCascadesItsDependentsAndKeepsTheAlbum) and asserts that an unavailable source stays in the library (SourceMatchRepositoryTest.anAvailabilityChangeOnTheLockedSourceDoesNotUnlockIt, MigrationTest seeds a Restricted source), but no test deletes a track_sources row and checks that the track, its credit and its playlist entry survive. Found by the phase-01 audit while checking each named trap.",
+      "foundUtc": "2026-10-13T20:33:01+00:00",
+      "resolution": "Added DatabaseConstraintTest.deletingASourceLeavesTheTrackCreditsAndPlaylistsIntact: it removes the track_sources row outright and asserts the track, its credit row, its playlist entry and its favourite all survive, and that the track's source count drops to zero. Retest: the :core::database suite ran green (exit 0) with the new test included.",
+      "evidence": "STATE\\evidence\\TUN-0102\\20261013T203306Z-source-loss-regression.json",
+      "closedUtc": "2026-10-13T20:34:22+00:00"
     }
   ]
 }

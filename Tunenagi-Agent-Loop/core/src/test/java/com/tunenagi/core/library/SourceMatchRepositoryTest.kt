@@ -60,7 +60,11 @@ class SourceMatchRepositoryTest {
         durationMs = durationMs
     )
 
-    private suspend fun addSource(externalId: String, preferred: Boolean = false, availability: SourceAvailability = SourceAvailability.Available) =
+    private suspend fun addSource(
+        externalId: String,
+        preferred: Boolean = false,
+        availability: SourceAvailability = SourceAvailability.Available
+    ) =
         TunenagiMappers.toTrackSourceEntity(
             Fixtures.source(trackId, externalId = externalId, availability = availability).copy(preferred = preferred)
         ).also { db.sourceDao().insert(it) }
@@ -124,7 +128,9 @@ class SourceMatchRepositoryTest {
         val candidates = listOf(candidate("first"), candidate("second"))
 
         val before = repository.resolveForTrack(trackId, query, candidates)
-        assertTrue("two perfect candidates need a user choice", before is SourceMatcher.Resolution.Accepted || before is SourceMatcher.Resolution.NeedsChoice)
+        val ambiguous = before is SourceMatcher.Resolution.Accepted ||
+            before is SourceMatcher.Resolution.NeedsChoice
+        assertTrue("two perfect candidates need a user choice", ambiguous)
 
         repository.confirmMatch(trackId, ProviderId.Audius, "second", score = 0.5, at = Fixtures.now)
         val after = repository.resolveForTrack(trackId, query, candidates)
