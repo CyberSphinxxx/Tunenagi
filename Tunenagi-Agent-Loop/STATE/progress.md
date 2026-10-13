@@ -224,3 +224,38 @@ below is the original entry's content.
 - **Next exact action**: phase 00 has TUN-0003 (device evidence, blocked) and TUN-0006 (first
   device record, depends on TUN-0003 and TUN-0005) left; TUN-0006 cannot start before TUN-0003
   produces a runtime. Otherwise the phase-00 independent audit is the remaining gate.
+
+
+## 2026-10-13T18:19Z - Buffy session (TUN-0003 runtime investigation; no task status change)
+
+- **Phase/task**: Phase 00 / TUN-0003 "Design tokens and navigation shell" - stays `blocked`;
+  this session produced measurements and documentation, not device evidence.
+- **Summary/change paths**: measured every Android-runtime path available on this host and wrote
+  the result down so the next session does not have to rediscover it. New:
+  `OPERATIONS/EMULATOR_RUNTIME.md`. Changed: `STATE/blockers.md` (ACTIVE section replaced with
+  the measured failure and three concrete unblock actions), `STATE/decisions.md` (ADR-007),
+  `STATE/progress.md` (this entry), `STATE/status.json` (checkpoint timestamps). Created
+  locally, outside the repository and not committed: the AVD `tunenagi_api33` under
+  `%USERPROFILE%\.android\avd`.
+- **Commands and exit codes**: raw probe output is kept locally under `STATE/evidence/TUN-0003/`
+  (`emu-probe2-*.log`, `emu-verbose.log`, `emulator-boot.log`), all under:
+  - `emulator -avd tunenagi_api33 -accel off -no-window -no-audio -no-boot-anim -no-snapshot`
+    variants, sampled for the QEMU child's cumulative CPU time: 0.4375 s constant over 540 s in
+    the control run, and 0.609375 / 0.453125 / 0.5 with no growth over 20-25 s in the other
+    three. adb reported `emulator-5554 offline` throughout: no guest execution.
+  - `-qemu -accel tcg` and `-qemu -cpu qemu64`: frontend SIGSEGV, exit 139.
+  - `emulator -help-accel` documents `off` as "Disables acceleration entirely"; the verbose run
+    shows QEMU printing `TCG doesn't support requested feature: CPUID.01H:ECX.avx`, so TCG is
+    the live accelerator and the failure is not "no accelerator was selected".
+  - `sc query aehd` -> 1060 before and after two cancelled elevation attempts.
+- **Device / emulator observations**: no runtime obtained. An AVD now exists and boots far
+  enough to open its adb port and register, so the remaining failure is precisely "the guest CPU
+  never executes" rather than "the emulator will not start". No screenshot exists and none was
+  fabricated.
+- **Commit SHA**: this slice (the commit that follows this entry).
+- **Blockers or risks**: TUN-0003 remains blocked on a one-time owner action - run
+  `silent_install_safe.bat` from an elevated console, or attach a device. With phase 00 at 4/6
+  verified and TUN-0006 depending on TUN-0003, `taskctl` correctly reports no runnable task.
+- **Next exact action**: with a runtime available, run the four-step procedure in
+  `OPERATIONS/EMULATOR_RUNTIME.md` (instrumented tests, install/launch, screenshots, then
+  `taskctl verify TUN-0003 --artifact device-*.png`), then TUN-0006, then the phase-00 audit.

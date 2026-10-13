@@ -70,7 +70,7 @@
       ],
       "status": "blocked",
       "evidence": [],
-      "notes": "Device evidence only: implementation, unit tests and command evidence are committed (d28ac34, 880fca6). No Android runtime is available - no device attached and the AEHD hypervisor driver install was cancelled at UAC, so the x86_64 emulator cannot start. Owner action: approve the elevation prompt or attach a device, then run :app:connectedDebugAndroidTest, install/launch the debug APK and capture device screenshots. See STATE/blockers.md."
+      "notes": "Re-measured 2026-10-13: -accel off is accepted (hypervisor check passes, QEMU spawns, adb registers) but the guest never executes (0.4375s constant CPU over 9 minutes, no growth in three more configs), and -qemu -accel tcg / -qemu -cpu qemu64 segfault the frontend. AEHD install still needs one elevation; two attempts were cancelled at UAC. Device evidence outstanding - see STATE/blockers.md and OPERATIONS/EMULATOR_RUNTIME.md."
     },
     {
       "id": "TUN-0004",
