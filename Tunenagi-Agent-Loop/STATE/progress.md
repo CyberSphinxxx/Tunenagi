@@ -169,7 +169,7 @@ below is the original entry's content.
   if they read zero files. Found because a deliberately over-long line was not reported.
 - **Device / emulator observations**: not applicable; this task's evidence kind is `command`
   only. The TUN-0003 runtime blocker in `STATE/blockers.md` is unchanged.
-- **Commit SHA**: recorded in the follow-up commit to this log.
+- **Commit SHA**: 778c50e (this slice: code, gates, licence proposal and state)
 - **Blockers or risks**: the licence is still a **proposal** - no `LICENSE` file exists and
   publishing is not possible until the owner decides (see `LEGAL/LICENSE_PROPOSAL.md`).
   ktlint/detekt adoption is deferred to TUN-0005. `.freebuff/` at the repository root is
