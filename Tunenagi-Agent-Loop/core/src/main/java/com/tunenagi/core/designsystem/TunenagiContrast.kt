@@ -60,7 +60,12 @@ object TunenagiContrast {
      * them, and so the reason survives in code rather than in a review comment.
      */
     val PROHIBITED_TEXT_PAIRS: List<Pair> = listOf(
-        Pair(TunenagiPalette.Secondary, TunenagiPalette.PrimarySubdued, AA_NORMAL_TEXT, "secondary text on subdued accent fill — 3.12:1, use OnBackground or a darker fill")
+        Pair(
+            TunenagiPalette.Secondary,
+            TunenagiPalette.PrimarySubdued,
+            AA_NORMAL_TEXT,
+            "secondary text on subdued accent fill (3.12:1); use OnBackground or a darker fill"
+        )
     )
 
     /** sRGB channel (0-255) to linear light. */

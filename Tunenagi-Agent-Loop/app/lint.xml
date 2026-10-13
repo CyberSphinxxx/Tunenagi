@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Tunenagi lint configuration — owned.
+
+    ObsoleteSdkInt is ignored for the launcher-icon folder only. Lint reports that
+    `mipmap-anydpi-v26` is redundant because minSdk is already 26 and suggests merging it
+    into `mipmap-anydpi`, but doing that breaks the build: AAPT2 then fails to resolve the
+    adaptive icon and linking stops with
+
+        Android resource linking failed
+        ERROR: app/src/main/AndroidManifest.xml: AAPT: error: resource mipmap/ic_launcher
+        (aka com.tunenagi.player:mipmap/ic_launcher) not found.
+
+    Reproduced on 2026-10-12 with a clean build after the rename, and resolved by moving the
+    folder back. The ignore is scoped to this path so the check still applies everywhere
+    else in the project.
+-->
+<lint>
+    <issue id="ObsoleteSdkInt">
+        <ignore path="src/main/res/mipmap-anydpi-v26" />
+    </issue>
+</lint>

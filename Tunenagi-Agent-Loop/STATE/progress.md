@@ -100,3 +100,81 @@ Do not erase previous entries. Each entry records what actually ran and what it 
   device), run `:app:connectedDebugAndroidTest`, install and launch the debug APK, capture
   `device-*.png` screenshots, then `taskctl.py verify TUN-0003 --artifact ...`. If the runtime
   stays unavailable, work TUN-0004 next.
+
+## 2026-10-11 - Tunenagi session (TUN-0001) - recovered
+
+This entry, plus `STATE/preflight/TUN-0001-environment.md` and
+`STATE/preflight/TUN-0001_preflight_test.py`, was written to a stray `STATE/` directory at
+the *repository root* instead of the kit's own `STATE/`. As a result TUN-0001's preflight
+document was never committed and this log had no record of the task. TUN-0004 (repository
+hygiene) copied the three artifacts into the kit and removed the root copy; nothing was
+reworded. The only content change is a single over-long `print(...)` line in
+`TUN-0001_preflight_test.py`, re-wrapped with identical output so the new formatting gate
+can stay uniform; the recovered test was re-run afterwards and still passes. The text
+below is the original entry's content.
+
+- **Phase/task**: Phase 00 / TUN-0001 Preflight SDK and provider policies.
+- **Summary/change paths**: `STATE/preflight/TUN-0001-environment.md` (environment
+  preflight: JDK, Android SDK/adb/emulator status, official provider/API terms, rights
+  posture) and `STATE/preflight/TUN-0001_preflight_test.py` (negative/failure-path test).
+- **Commands and exit codes (evidence paths)**:
+  - `python SCRIPTS/run_check.py --task TUN-0001 --name preflight-neg-tests -- python
+    STATE/preflight/TUN-0001_preflight_test.py` -> exit 0. Evidence:
+    `STATE/evidence/TUN-0001/20261010T192645Z-preflight-neg-tests.json` (that manifest
+    records the absolute path the script had at the time, before the move).
+  - `python SCRIPTS/taskctl.py verify TUN-0001 --evidence <manifest> --artifact
+    STATE/evidence/TUN-0001/device-preflight.txt` -> exit 0.
+- **Device / emulator observations**: no SDK/adb/emulator at the time; recorded as a
+  blocker rather than faked.
+- **Commit SHA**: not committed then; the recovered artifacts land with the TUN-0004 slice.
+- **Blockers or risks**: the preflight document records JDK 25.0.1 as the environment JDK.
+  Kotlin 2.0.20 cannot parse JDK 25, so builds now pin JDK 21 - see `STATE/blockers.md`.
+- **Next exact action (as of that session)**: claim TUN-0002 once the SDK was configured.
+
+## 2026-10-13T08:20Z - deepseek-v4-flash session (TUN-0004)
+
+- **Phase/task**: Phase 00 / TUN-0004 "Repository hygiene and licenses" - claimed,
+  implemented, command evidence captured. Device: none needed (`evidenceKinds: [command]`).
+- **Summary/change paths**: added real formatting, secret and licensing hygiene.
+  New: `OPERATIONS/GIT_CONVENTIONS.md`, `LEGAL/LICENSE_PROPOSAL.md`,
+  `LEGAL/THIRD_PARTY_NOTICES.md`, `SCRIPTS/check_format.py`, `SCRIPTS/secret_scan.py`,
+  `app/lint.xml`, `STATE/preflight/TUN-0001-environment.md` (recovered),
+  `STATE/preflight/TUN-0001_preflight_test.py` (recovered).
+  Changed: `.gitattributes` (LF policy for the index, CRLF only for bat/cmd, binaries
+  marked), `.gitignore` (local Gradle distribution downloads, heap dumps, logs, .kotlin),
+  `app/.../ui/shell/TunenagiShell.kt` (ModifierParameter), `app/src/main/res/mipmap-anydpi-v26/*`
+  (monochrome layer), `core/.../TunenagiContrast.kt` (one over-long line re-wrapped).
+  Removed: the stray repository-root `STATE/` (contents preserved in the kit, ADR-005).
+- **Commands and exit codes (evidence paths)**, all under
+  `STATE/evidence/TUN-0004/`:
+  - `lint-and-assemble` -> exit 0, BUILD SUCCESSFUL, 103 tasks, 25 core tests / 0 failures
+    (`20261013T080401Z-lint-and-assemble.json`). An earlier attempt failed with exit 1
+    (`20261013T080049Z-lint-and-assemble.json`) - kept as the honest record of the
+    `mipmap-anydpi` rename breaking AAPT2 resource linking.
+  - `format-gate` -> exit 0, 118 tracked files, 0 problems (`20261013T080527Z-format-gate.json`);
+    `format-gate-selftest` -> exit 0 (`20261013T080415Z-format-gate-selftest.json`).
+  - `secret-scan --history` -> exit 0, 117 tracked files plus full history, 0 findings
+    (`20261013T080448Z-secret-scan.json`); `secret-scan-selftest` -> exit 0
+    (`20261013T080447Z-secret-scan-selftest.json`).
+  - `preflight-recovered` -> exit 0 (`20261013T080531Z-preflight-recovered.json`).
+  - `dependency-inventory` -> exit 0 (`20261013T080550Z-dependency-inventory.json`).
+  - Sanitized summary artifact: `TUN-0004-static-check-summary.txt`.
+- **Static analysis result**: `:core` 0 findings; `:app` 0 errors, and the three actionable
+  warnings are gone - `ModifierParameter`, `ObsoleteSdkInt`, `MonochromeLauncherIcon` x2.
+  What remains is 45 version-update advisories (`AndroidGradlePluginVersion` 6,
+  `GradleDependency` 39), left visible on purpose because ADR-001 pins versions.
+- **Defect found and corrected in the new gates**: `git show :<path>` resolves against the
+  repository root, not the working directory, so both gates initially reported "clean"
+  while reading nothing. Fixed by prepending the checkout prefix, and both now warn loudly
+  if they read zero files. Found because a deliberately over-long line was not reported.
+- **Device / emulator observations**: not applicable; this task's evidence kind is `command`
+  only. The TUN-0003 runtime blocker in `STATE/blockers.md` is unchanged.
+- **Commit SHA**: recorded in the follow-up commit to this log.
+- **Blockers or risks**: the licence is still a **proposal** - no `LICENSE` file exists and
+  publishing is not possible until the owner decides (see `LEGAL/LICENSE_PROPOSAL.md`).
+  ktlint/detekt adoption is deferred to TUN-0005. `.freebuff/` at the repository root is
+  another tool's local state and was deliberately left alone. The two new gate scripts are
+  enforcement code and need coverage by the phase-00 independent audit (ADR-004).
+- **Next exact action**: TUN-0005 (CI build and local verification commands) is next once
+  TUN-0004 is verified; it must call `check_format.py`, `secret_scan.py` and the Gradle
+  lint/test tasks. Phase 00 then needs its independent audit.

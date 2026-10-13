@@ -55,10 +55,10 @@ const val NAV_RAIL_TAG = "nav-rail"
  */
 @Composable
 fun TunenagiShell(
+    modifier: Modifier = Modifier,
     playerState: MiniPlayerState = MiniPlayerState.None,
     layout: ShellLayout = TunenagiWindowSize.layoutFor(LocalConfiguration.current.screenWidthDp),
-    navController: NavHostController = rememberNavController(),
-    modifier: Modifier = Modifier
+    navController: NavHostController = rememberNavController()
 ) {
     val currentRoute by navController.currentBackStackEntryAsState()
     val onPlayerRoute = currentRoute?.destination?.route == TunenagiRoutes.Player
