@@ -90,7 +90,7 @@ jobs:
           cache-provider: basic
 
       - name: JVM unit tests
-        run: bash gradlew :core:testDebugUnitTest
+        run: bash gradlew :core:testDebugUnitTest :app:testDebugUnitTest
 
       - name: Assemble debug APK
         run: bash gradlew :app:assembleDebug

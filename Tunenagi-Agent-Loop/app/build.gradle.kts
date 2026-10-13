@@ -54,6 +54,20 @@ android {
         compose = true
     }
 
+    // Android UI tests that do not need an attached device. Robolectric runs the real
+    // Android runtime (framework classes, resources, Compose) inside the JVM, so the shell's
+    // navigation behaviour is verified by an automated check on every machine, not only where
+    // an emulator happens to be installed. `src/sharedTest` holds the test sources that run in
+    // both places: the JVM variant here and the instrumented variant on a device.
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
+    sourceSets.getByName("test").java.srcDir("src/sharedTest/java")
+    sourceSets.getByName("androidTest").java.srcDir("src/sharedTest/java")
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -107,6 +121,12 @@ dependencies {
     ksp(libs.room.compiler)
 
     testImplementation(libs.junit)
+    // JVM-hosted Android runtime for the shared Compose UI tests (no device required).
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.androidx.test.ext.junit)

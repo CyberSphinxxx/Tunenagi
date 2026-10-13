@@ -64,21 +64,30 @@ fun TunenagiShell(
     val onPlayerRoute = currentRoute?.destination?.route == TunenagiRoutes.Player
     val motionEnabled = rememberMotionEnabled()
 
+    // The mini-player is part of the bottom chrome, not of the content: in the compact
+    // layout it sits above the navigation bar inside the same slot, and in the wide layout,
+    // which has no bottom bar, it closes the content column. Each layout therefore mounts
+    // exactly one host. Mounting it in both places reserved its height twice and put two
+    // identical clickable nodes in the semantics tree (found by TunenagiShellTest on the
+    // JVM, filed as BUG-0001 and fixed here).
+    val miniPlayerVisible = !onPlayerRoute
+    val openPlayer = { navController.openPlayer() }
+
     Scaffold(
         modifier = modifier,
         bottomBar = {
             // The player owns the whole screen; navigation and the mini-player both step
             // aside so nothing competes with the transport controls once they exist.
-            if (!onPlayerRoute && layout == ShellLayout.Compact) {
+            if (miniPlayerVisible && layout == ShellLayout.Compact) {
                 Column {
-                    MiniPlayerHost(playerState, onExpand = { navController.openPlayer() })
+                    MiniPlayerHost(playerState, onExpand = openPlayer)
                     TunenagiNavigationBar(navController)
                 }
             }
         }
     ) { contentPadding ->
         Row(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-            if (!onPlayerRoute && layout == ShellLayout.Wide) {
+            if (miniPlayerVisible && layout == ShellLayout.Wide) {
                 TunenagiNavigationRail(navController)
             }
             Column(modifier = Modifier.fillMaxSize()) {
@@ -87,8 +96,8 @@ fun TunenagiShell(
                     motionEnabled = motionEnabled,
                     modifier = Modifier.weight(1f)
                 )
-                if (!onPlayerRoute) {
-                    MiniPlayerHost(playerState, onExpand = { navController.openPlayer() })
+                if (miniPlayerVisible && layout == ShellLayout.Wide) {
+                    MiniPlayerHost(playerState, onExpand = openPlayer)
                 }
             }
         }

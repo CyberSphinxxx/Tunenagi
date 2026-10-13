@@ -1,4 +1,18 @@
 {
   "schemaVersion": 1,
-  "items": []
+  "items": [
+    {
+      "id": "BUG-0001",
+      "phase": "00",
+      "relatedTask": "TUN-0003",
+      "severity": "Medium",
+      "status": "closed",
+      "title": "Compact shell mounts the mini-player twice",
+      "reproduction": "app/src/main/java/com/tunenagi/player/ui/shell/TunenagiShell.kt passed MiniPlayerHost both to Scaffold(bottomBar=...) and to the content Column. In ShellLayout.Compact with MiniPlayerState.Track both were composed: the bottom bar reserved the bar's height twice and the semantics tree held two nodes with TestTag 'mini-player' (measured: node #172 at t=218..304px and node #123 at t=304..390px). Found by TunenagiShellTest on the JVM (Robolectric): 'Failed to perform checkIsDisplayed check: Expected at most 1 node but found 2 nodes that satisfy (TestTag = mini-player)'. SPEC/UX_DESIGN.md requires the mini-player to sit above the navigation bar, i.e. exactly once.",
+      "foundUtc": "2026-10-13T19:43:25+00:00",
+      "resolution": "Fixed in TunenagiShell.kt: the layout now mounts exactly one MiniPlayerHost per layout (compact: inside the bottom-bar Column above the navigation bar; wide: closing the content column), with the decision hoisted into miniPlayerVisible/layout so the two call sites cannot disagree again. Retest: :app:testDebugUnitTest --rerun-tasks rebuilt and ran the shell suite on the JVM, exit 0, 8 tests / 0 failures, including two new regression tests asserting exactly one 'mini-player' and one navigation container node in each layout.",
+      "evidence": "STATE\\evidence\\TUN-0003\\20261013T194215Z-jvm-android-ui-suite.json",
+      "closedUtc": "2026-10-13T19:43:29+00:00"
+    }
+  ]
 }
