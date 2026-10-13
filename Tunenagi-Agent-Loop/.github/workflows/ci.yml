@@ -62,6 +62,9 @@ jobs:
       - name: CI definition check
         run: python SCRIPTS/check_ci.py
 
+      - name: Dependency direction
+        run: python SCRIPTS/check_boundaries.py
+
   android:
     name: Build, unit tests and lint
     runs-on: ubuntu-24.04
