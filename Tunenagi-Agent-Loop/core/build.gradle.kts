@@ -44,6 +44,20 @@ android {
         compose = true
     }
 
+    // The database is exercised on the JVM: Robolectric supplies the Android framework and the
+    // SQLite implementation Room talks to, so the schema, the foreign keys and the DAO
+    // transactions are asserted by an ordinary test run on any machine (ADR-008).
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
+    // The exported Room schemas are test *assets*: a future migration test builds its "old
+    // database" from the committed JSON rather than from the current entities, which is the only
+    // way a migration that works solely on an empty install gets caught.
+    sourceSets.getByName("test").assets.srcDir("$projectDir/schemas")
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -85,12 +99,21 @@ dependencies {
     ksp(libs.room.compiler)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.kotlinx.coroutines.test)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
+}
+
+// Room's schema JSON is the committed contract for every version this app has ever shipped.
+// KSP writes it here; the migration tests read it back.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 // The toolchain-contract test reads the repository's real version catalog. Inject the
