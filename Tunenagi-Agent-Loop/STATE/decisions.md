@@ -211,3 +211,43 @@ phase-00 audit, TUN-0009 (release CI).
 
 **Owner review needed?** No for the mechanism. Yes before the first push, which is what
 actually executes this pipeline.
+
+
+## ADR-007 - Device evidence waits for a real runtime, and software emulation is not a substitute (2026-10-13T18:19Z)
+
+**Context**: TUN-0003's contract requires `command` *and* `device` evidence. The device half
+could not be produced: no device is attached and the emulator cannot execute a guest on this
+host. The previous blocker note asserted that `-accel off` "is not a supported fallback"
+without a measurement, which left genuinely open whether that path had been tried and what it
+actually does.
+
+**Options**: (a) keep retrying the emulator; (b) mark TUN-0003 verified on the command evidence
+alone and note the missing device artifact in prose; (c) measure every runtime path, keep the
+task `blocked`, and state the single owner action precisely; (d) substitute a JVM/Robolectric
+test for the device artifact.
+
+**Decision**: (c). `OPERATIONS/EMULATOR_RUNTIME.md` records the measurements: `-accel off` is
+accepted - the hypervisor check passes, QEMU spawns, adb registers - but the guest never
+executes (0.4375 s of CPU in nine minutes; no growth in three further configurations), and two
+CPU/accelerator overrides crash the frontend. AEHD acceleration remains the supported path and
+needs one elevation that the sandbox could not complete, twice.
+
+**Consequences**:
+- The blocker names an action the owner can take in seconds (run `silent_install_safe.bat` in
+  an elevated console, or attach a device) instead of an unmeasured claim about a flag.
+- (b) is rejected: `taskctl verify` exists precisely to refuse a claim whose evidence is
+  missing, and weakening it here would devalue every later `verified` status.
+- (d) is rejected: a JVM substitute exercises different code paths and cannot stand in for
+  `device` evidence. For the Compose shell, whose subject *is* real-device behaviour, it would
+  be weaker evidence wearing the same label.
+- `-accel off` must never be offered as a device-test substitute in CI. A green CI run proves
+  nothing about device behaviour, and this host cannot manufacture that proof in software.
+- Phase 00 cannot be audited, and no later phase can start, until a runtime exists: `taskctl`
+  gates each phase on the previous phase's audit, which gates on all six phase-00 tasks being
+  verified.
+
+**Affected tasks**: TUN-0003 (stays `blocked`), TUN-0006 (first device record; depends on it),
+the phase-00 audit and every later phase.
+
+**Owner review needed?** Yes - the runtime decision is the owner's, and installing a kernel
+driver is a system-level change this project must not make unasked.
