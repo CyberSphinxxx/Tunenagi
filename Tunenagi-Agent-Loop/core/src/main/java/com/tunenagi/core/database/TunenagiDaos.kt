@@ -132,6 +132,13 @@ interface SourceDao {
         setPreferred(sourceId)
     }
 
+    /** A locked source is one the user chose by hand; matching must not move away from it. */
+    @Query("UPDATE track_sources SET locked = :locked WHERE id = :id")
+    suspend fun setLocked(id: String, locked: Boolean): Int
+
+    @Query("SELECT * FROM track_sources WHERE trackId = :trackId AND locked = 1 ORDER BY providerId, id")
+    suspend fun lockedFor(trackId: String): List<TrackSourceEntity>
+
     @Query("DELETE FROM track_sources WHERE id = :id")
     suspend fun delete(id: String): Int
 
@@ -153,6 +160,9 @@ interface PlaylistDao {
 
     @Query("SELECT * FROM playlists ORDER BY isSystem DESC, name COLLATE NOCASE, id")
     fun observePlaylists(): Flow<List<PlaylistEntity>>
+
+    @Query("SELECT * FROM playlists ORDER BY isSystem DESC, name COLLATE NOCASE, id")
+    suspend fun all(): List<PlaylistEntity>
 
     @Query("UPDATE playlists SET name = :name, description = :description, updatedAt = :updatedAt WHERE id = :id")
     suspend fun rename(id: String, name: String, description: String?, updatedAt: Long): Int
@@ -210,6 +220,9 @@ interface FavoriteDao {
 
     @Query("SELECT * FROM favorites ORDER BY addedAt DESC, trackId")
     fun observeAll(): Flow<List<FavoriteEntity>>
+
+    @Query("SELECT * FROM favorites ORDER BY addedAt DESC, trackId")
+    suspend fun all(): List<FavoriteEntity>
 
     @Query("SELECT COUNT(*) FROM favorites")
     suspend fun count(): Int
