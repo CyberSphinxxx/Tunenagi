@@ -12,8 +12,12 @@ import com.tunenagi.core.model.Playlist
 import com.tunenagi.core.model.PlaylistEntry
 import com.tunenagi.core.model.PlaylistEntryId
 import com.tunenagi.core.model.PlaylistId
+import com.tunenagi.core.model.PlaybackSnapshot
 import com.tunenagi.core.model.PluginInstallation
 import com.tunenagi.core.model.ProviderId
+import com.tunenagi.core.model.QueueItem
+import com.tunenagi.core.model.QueueItemId
+import com.tunenagi.core.model.RepeatMode
 import com.tunenagi.core.model.SourceAvailability
 import com.tunenagi.core.model.Track
 import com.tunenagi.core.model.TrackArtist
@@ -251,6 +255,38 @@ object TunenagiMappers {
         score = entity.score,
         manuallyConfirmed = entity.manuallyConfirmed,
         confirmedAt = Instant.ofEpochMilli(entity.confirmedAt)
+    )
+
+    // ---- playback ------------------------------------------------------------------------
+
+    fun toQueueItem(entity: PlaybackQueueItemEntity) = QueueItem(
+        id = QueueItemId.parse(entity.id),
+        trackId = TrackId.parse(entity.trackId),
+        sourceOverrideId = entity.sourceOverrideId?.let(TrackSourceId::parse),
+        position = entity.position,
+        addedAt = Instant.ofEpochMilli(entity.addedAt)
+    )
+
+    fun toQueueItemEntity(item: QueueItem) = PlaybackQueueItemEntity(
+        id = item.id.value,
+        trackId = item.trackId.value,
+        sourceOverrideId = item.sourceOverrideId?.value,
+        position = item.position,
+        addedAt = item.addedAt.toEpoch()
+    )
+
+    fun toSnapshot(
+        queue: List<PlaybackQueueItemEntity>,
+        state: PlaybackStateEntity?
+    ) = PlaybackSnapshot(
+        queue = queue.map(::toQueueItem),
+        currentItemId = state?.currentQueueItemId?.let(QueueItemId::parse),
+        progressMs = state?.progressMs ?: 0L,
+        shuffleEnabled = state?.shuffleEnabled ?: false,
+        shuffleSeed = state?.shuffleSeed,
+        // A corrupt repeat mode must not be silently read as "off".
+        repeatMode = state?.repeatMode?.let(RepeatMode::fromPersisted) ?: RepeatMode.Off,
+        lastUpdatedAt = state?.lastUpdatedAt?.let(Instant::ofEpochMilli)
     )
 
     fun toMetadataMatchEntity(match: MetadataMatch) = MetadataMatchEntity(
