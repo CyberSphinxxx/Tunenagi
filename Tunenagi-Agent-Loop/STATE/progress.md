@@ -216,7 +216,7 @@ below is the original entry's content.
   checkout, `contents: read`, no secrets, explicit working directory.
 - **Device / emulator observations**: none; this task has no device evidence kind. TUN-0003's
   runtime blocker in `STATE/blockers.md` is unchanged.
-- **Commit SHA**: recorded in the follow-up commit to this log.
+- **Commit SHA**: 90250d5 (this slice: CI, verify.py, gates and state)
 - **Blockers or risks**: CI has never executed - the first run happens on push, which is an
   owner action, and `OPERATIONS/CI_AND_VERIFICATION.md` states that as residual risk rather
   than implying a green pipeline. The new gate scripts need phase-00 audit coverage. ktlint

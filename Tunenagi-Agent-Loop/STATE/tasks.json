@@ -68,9 +68,9 @@
         "command",
         "device"
       ],
-      "status": "in_progress",
+      "status": "blocked",
       "evidence": [],
-      "notes": "Claimed 2026-10-12T17:45:27+00:00"
+      "notes": "Device evidence only: implementation, unit tests and command evidence are committed (d28ac34, 880fca6). No Android runtime is available - no device attached and the AEHD hypervisor driver install was cancelled at UAC, so the x86_64 emulator cannot start. Owner action: approve the elevation prompt or attach a device, then run :app:connectedDebugAndroidTest, install/launch the debug APK and capture device screenshots. See STATE/blockers.md."
     },
     {
       "id": "TUN-0004",
