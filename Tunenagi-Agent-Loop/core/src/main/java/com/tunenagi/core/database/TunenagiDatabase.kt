@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.migration.Migration
 
 /**
  * The library database — owned.
@@ -30,9 +29,12 @@ import androidx.room.migration.Migration
         FavoriteEntity::class,
         LyricsCacheEntity::class,
         PluginInstallationEntity::class,
-        MetadataMatchEntity::class
+        MetadataMatchEntity::class,
+        PlaybackQueueItemEntity::class,
+        PlaybackStateEntity::class,
+        PlaybackHistoryEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class TunenagiDatabase : RoomDatabase() {
@@ -57,6 +59,12 @@ abstract class TunenagiDatabase : RoomDatabase() {
 
     abstract fun metadataMatchDao(): MetadataMatchDao
 
+    abstract fun queueDao(): QueueDao
+
+    abstract fun playbackStateDao(): PlaybackStateDao
+
+    abstract fun historyDao(): HistoryDao
+
     companion object {
         const val DATABASE_NAME = "tunenagi.db"
 
@@ -72,13 +80,3 @@ abstract class TunenagiDatabase : RoomDatabase() {
     }
 }
 
-/**
- * The explicit migration list.
- *
- * Empty at version 1 — version 2 adds the playback persistence tables and is defined in
- * `TunenagiMigrations`. Keeping the list as a single array means a reviewer can see every schema
- * change this app has ever shipped in one place, in order.
- */
-object TunenagiMigrations {
-    val ALL: Array<Migration> = arrayOf()
-}

@@ -308,3 +308,50 @@ phase-00 audit and all later phase gates.
 **Owner review needed?** Already given, and needed again before release: the deferral must be
 closed - the register emptied, or its residue explicitly accepted - before the project can claim
 anything about a working app on a phone.
+
+## ADR-009 - The schema ships in two steps so the migration path is proven with real data (2026-10-14)
+
+**Context**: TUN-0102 owed the library tables and TUN-0103 owed "explicit Room migration, no
+destructive fallbacks, migrate seed old-schema database without user data loss". Writing one
+version-1 schema containing everything and then inventing a version 2 afterwards would have made
+the migration test circular: it would prove that a migration from the schema it just wrote to the
+schema it just wrote works.
+
+**Options**: (a) one version-1 schema with every table, and a migration test that only checks the
+current schema; (b) two versions where version 1 is the library and version 2 adds playback
+persistence, so the first migration moves *real* user data (playlists with duplicated tracks,
+favourites, lyrics, a plugin, an unavailable source) forward; (c) wait until phase 02 has a real
+schema change to write any migration at all.
+
+**Decision**: (b). Version 1 (TUN-0102) is the library: tracks, artists, albums, credits, sources,
+playlists, entries, favourites, lyrics, plugins, metadata matches. Version 2 (TUN-0103) adds the
+playback tables the queue and history repositories need. The split is inside phase 01, so the phase
+still delivers every table its contract lists; what moves is which task writes which table, and
+TUN-0103's notes and the phase audit both say so.
+
+**Consequences**:
+- The "old database" in the migration test is rebuilt from Room's own exported DDL for version 1
+  (`core/schemas/.../1.json`, committed), with Room's `${TABLE_NAME}` placeholder substituted. It
+  therefore has exactly the schema a real installation had, including `user_version = 1`, and it is
+  seeded with data before the production open path is used.
+- Room validates the result of a migration against the entities on every open, so a migration that
+  produces the wrong schema throws `Migration didn't properly handle ...`. A test proves that by
+  registering a deliberately incomplete migration and asserting the open fails *and* that the user's
+  rows are still on disk afterwards.
+- A second test proves the opposite direction: with no migration registered at all, Room refuses to
+  open the database and the seeded rows survive — the difference between "the app failed to start"
+  and "the app deleted someone's library to start".
+- `MIGRATION_1_2` adds indices for the two foreign key columns as well, because Room warns (rightly)
+  that an unindexed child column turns every parent write into a table scan. The warning is fixed,
+  not suppressed.
+- SQLite's NULL-in-a-unique-index behaviour (ADR-worthy because it is a trap, recorded here rather
+  than in a comment): `track_sources.sourceVariant` stores `""` for "no variant", because a nullable
+  column would have let the same provider row be imported twice while the identity index reported no
+  conflict. The domain model keeps `String?`; only the column is normalised.
+
+**Affected tasks**: TUN-0102 (version 1), TUN-0103 (version 2 and the migration harness), TUN-0105
+and TUN-0106 (the repositories that use the new tables), every later phase that changes the schema
+(the harness is already proven).
+
+**Owner review needed?** No: no product requirement changed, and the phase-01 audit reviews the
+split explicitly.
