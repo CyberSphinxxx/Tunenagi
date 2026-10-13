@@ -88,6 +88,8 @@ STEPS = [
          description="credentials in tracked files and history"),
     Step("ci-definition", [PY, "SCRIPTS/check_ci.py"],
          description="CI workflow matches what runs locally"),
+    Step("boundaries", [PY, "SCRIPTS/check_boundaries.py"],
+         description="dependency direction between the layers"),
     # Both modules: `:app` runs the Android UI suites from `src/sharedTest` on the JVM under
     # Robolectric, so leaving it out would mean the shell's only automated check never ran in CI.
     Step("unit-tests", GRADLE + [":core:testDebugUnitTest", ":app:testDebugUnitTest"], needs_java=True,

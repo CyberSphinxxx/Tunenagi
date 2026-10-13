@@ -306,9 +306,13 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0107\\20261013T202804Z-clean-build-and-tests.json",
+        "STATE\\evidence\\TUN-0107\\20261013T202722Z-boundary-gate-and-selftest.json",
+        "STATE\\evidence\\TUN-0107\\20261013T202725Z-boundary-selftest.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-13T20:32:38+00:00; semantic review still required."
     },
     {
       "id": "TUN-0201",
