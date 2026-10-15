@@ -86,6 +86,24 @@ interface TrackDao {
     @Query("UPDATE tracks SET deletedTombstone = 1, updatedAt = :updatedAt WHERE id = :id")
     suspend fun tombstone(id: String, updatedAt: Long): Int
 
+    /**
+     * Refreshes the fields a rescan can legitimately know better: the title, its sort key, the
+     * duration and the artwork reference. Everything else about a track (its ids, its credits, its
+     * album link) is a user-facing fact that a file's tags do not get to overwrite.
+     */
+    @Query(
+        "UPDATE tracks SET title = :title, sortTitle = :sortTitle, durationMs = :durationMs, " +
+            "artworkRef = :artworkRef, updatedAt = :updatedAt WHERE id = :id"
+    )
+    suspend fun applyScannedMetadata(
+        id: String,
+        title: String,
+        sortTitle: String,
+        durationMs: Long?,
+        artworkRef: String?,
+        updatedAt: Long
+    ): Int
+
     @Query("DELETE FROM tracks WHERE id = :id")
     suspend fun hardDelete(id: String): Int
 }
@@ -115,6 +133,20 @@ interface SourceDao {
             "AND sourceVariant = :variant"
     )
     suspend fun byIdentity(providerId: String, externalId: String, variant: String): TrackSourceEntity?
+
+    /**
+     * Every source one discovery owns: a provider *and* its grant. `builtin.local` alone is not
+     * enough to attribute a failure, because MediaStore and a SAF folder are two grants that fail
+     * independently — losing the folder grant must not mark the on-device library unreadable.
+     */
+    @Query(
+        "SELECT * FROM track_sources WHERE providerId = :providerId AND sourceVariant = :variant " +
+            "ORDER BY id"
+    )
+    suspend fun forProviderVariant(providerId: String, variant: String): List<TrackSourceEntity>
+
+    @Query("UPDATE track_sources SET localUri = :localUri, contentType = :contentType WHERE id = :id")
+    suspend fun updateLocation(id: String, localUri: String, contentType: String?): Int
 
     @Query("UPDATE track_sources SET availability = :availability, lastCheckedAt = :checkedAt WHERE id = :id")
     suspend fun updateAvailability(id: String, availability: String, checkedAt: Long): Int
