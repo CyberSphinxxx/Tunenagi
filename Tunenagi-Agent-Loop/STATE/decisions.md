@@ -420,3 +420,43 @@ audit, and every later task that touches playback.
 
 **Owner review needed?** No: no product behaviour changed, and the rule only removes a way to
 violate an existing architectural requirement.
+
+## ADR-012 - A provider layer of its own, and the sub-package hole the gate had (2026-10-15)
+
+**Context**: TUN-0202 needs to read MediaStore and persistable SAF grants, which is Android API
+access - something `:core` deliberately does almost nowhere. Two things had to be decided: where
+that code lives, and what stops it from reaching the player, the plugin sandbox or an HTTP client.
+While adding the rule, the gate itself turned out to have a hole: `check_boundaries.py` looked a
+file's layer up by *exact* package name, so `com.tunenagi.core.model.queue` (a sub-package of a
+layer that has a rule) was covered by nothing, and the new `...core.provider.local` would have been
+covered by nothing either.
+
+**Options**: (a) put discovery in `core.library`, which already has a rule - rejected because that
+layer is repositories, matching and playlists, and `SPEC/ARCHITECTURE.md` names `provider/local` as
+its own adapter; (b) leave the gate alone and rely on review; (c) add the layer with a rule, and
+make rule lookup prefix-based so a sub-package cannot escape a layer's rule.
+
+**Decision**: (c). `com.tunenagi.core.provider` may import `core.model`, `core.database` and
+`core.library`, and may not import Compose, `core.playback`, `core.plugins` or the networking
+libraries - Android itself is *allowed* there, because reading a provider is exactly what an
+adapter is for, and forbidding it would only push the same code into a layer the gate was not
+written for. Rule lookup is now the longest prefix match, so `core.model.queue` is checked by B1
+and `core.provider.local` by B11.
+
+**Consequences**:
+- B11 is in the graph document (B9 keeps the two in step) and in the self-test in both directions: a
+  provider adapter importing playback must fail, and one importing MediaStore plus a model type
+  must pass.
+- A second self-test case proves the prefix fix (a `core.model.queue` file importing Android must
+  raise B1), so the hole cannot come back silently.
+- The allowed set is deliberately *not* widened for streaming providers yet: a future
+  `provider.audius` will need `core.network` as well, and that is a decision to make in its own ADR
+  rather than to guess now.
+- The gate change strengthens rather than weakens the check, which `OPERATIONS/STATE_PROTOCOL.md`
+  requires to be audited: it is part of the phase-02 audit's scope, together with ADR-011's B10.
+
+**Affected tasks**: TUN-0202 (the layer), TUN-0107 (the gate), the phase-02 audit, and every later
+provider task.
+
+**Owner review needed?** No: an architectural rule was made enforceable, and no product behaviour
+or acceptance criterion changed.

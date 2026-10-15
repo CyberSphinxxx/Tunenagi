@@ -396,3 +396,60 @@ below is the original entry's content.
   `Connecting`, not `Connected`, without a device): the same deferral ADR-008 records.
 - **Next exact action**: TUN-0202 - discover rights-cleared local media through MediaStore and SAF
   grants, and handle revocation and unavailable files.
+
+## 2026-10-15T20:30Z - Codebuff session (phase 02, TUN-0202)
+
+- **Phase/tasks**: TUN-0202 verified (phase 02, 2/8). `python SCRIPTS/taskctl.py next` now points at
+  TUN-0203 (local playable source resolver).
+- **What was built**: a new `com.tunenagi.core.provider.local` layer. `MediaStoreAudioDiscovery`
+  reads the device library (`IS_MUSIC != 0`, a bounded projection, artwork derived from the album id)
+  and `SafTreeAudioDiscovery` reads one persistable folder grant through its child-documents uri;
+  both report `PermissionRequired` when the provider throws `SecurityException`, which is Android's
+  own revocation signal, and `Failed` - never an empty library - when the provider breaks. Row
+  reading goes through one `AudioRowSource` seam that *consumes* the cursor in a block, so the query
+  and the `use` are adjacent and no caller can leak one. `LocalLibraryIndexer` applies what was found
+  to real Room rows through the database's own unique identity `(providerId, externalId,
+  sourceVariant)`: new files are added, changed tags are applied, an unchanged file writes nothing at
+  all, a file that is gone is marked `StorageGone` (never deleted, so its track, credits, playlist
+  entries and history survive), a file that comes back is *restored* rather than reimported, and a
+  duplicate row inside one pass is counted instead of aborting the transaction.
+- **Grants fail independently**: MediaStore and each SAF folder are separate variants, so
+  `LocalLibraryScanner` marks only the failing grant's sources `PermissionRequired` - losing a folder
+  must not make the on-device library unreadable - while a provider *error* changes nothing, because a
+  broken query is not evidence that a file is gone.
+- **The gate grew a rule, and a hole was found in it**: `SCRIPTS/check_boundaries.py` gained **B11**
+  (a provider adapter may read Android storage - that is what it is for - but may not import Compose,
+  playback, plugins or the networking libraries), with both directions in the self-test and the row
+  in `OPERATIONS/DEPENDENCY_GRAPH.md`. While adding it, rule lookup turned out to be an *exact*
+  package match, so any sub-package of a layer (`com.tunenagi.core.model.queue`) was checked by
+  nothing; lookup is now the longest prefix match, and a self-test case proves the domain layer's
+  rule reaches a sub-package. Recorded as ADR-012.
+- **Commands and exit codes (evidence paths)**:
+  - `:core:testDebugUnitTest --tests LocalMediaDiscoveryTest --rerun-tasks` -> exit 0, 19 tests
+    (`STATE/evidence/TUN-0202/20261015T202441Z-local-discovery-tests.json`). Two of those failed on
+    the first run for real reasons, both fixed in the test rather than in the expectation: a fixture
+    row was duplicated by mistake, and `updatedAt` cannot move when the clock is frozen, so the
+    second scan now happens a minute later. The failure output is in that first run's XML, kept on
+    disk.
+  - `python SCRIPTS/verify.py` -> exit 0, 9/9 steps (`.../20261015T202518Z-verify-all-steps.json`).
+    The first full run **failed** `lint-report` on a genuine finding - `Recycle: this Cursor should be
+    freed up after use` (`.../20261015T201905Z-verify-all-steps.json`) - which is what the
+    consume-in-a-block seam above fixes. It was fixed rather than baselined.
+  - `python SCRIPTS/check_boundaries.py` -> exit 0 (69 files); `--self-test` -> exit 0, including
+    B11 in both directions and the sub-package case (`.../20261015T202722Z-boundary-gate-and-self-test.json`).
+    Two earlier boundary runs exited non-zero inside this task and are kept: one because a careless
+    edit of mine had stripped the `core/src/main/java/...` prefix from `PLAYER_LAYER_PATH`, which made
+    B10 fire on the playback layer itself - the gate caught a regression in the gate, which is the
+    only reason it was noticed.
+- **Test totals now**: 196 JVM tests (`:core` 171 across 15 classes, `:app` 25 across 4), 0 failures.
+- **Device / emulator observations**: none possible (no device, no hypervisor driver). The substitute
+  is stated rather than implied: the tests drive the real query-building code, real `Cursor` objects
+  and a real Room database with its real indices. They do **not** prove a real MediaStore scan, a real
+  SAF picker grant, provider mime-type behaviour or artwork decoding - all of that is in
+  `OPERATIONS/DEFERRED_VERIFICATION.md` (ADR-008), and the task note records the substitution.
+- **Blockers or risks**: the standing deferral above; plus the honest limits of this slice - album and
+  artist rows are created from tags without grouping, artwork is referenced but never decoded, and
+  nothing yet *plays* a discovered file (that is TUN-0203, including `StorageGone`/`PermissionRequired`
+  at resolve time).
+- **Next exact action**: TUN-0203 - resolve a playable local source for a track and its `TrackSource`,
+  with typed errors for unsupported formats, missing files and missing permission.

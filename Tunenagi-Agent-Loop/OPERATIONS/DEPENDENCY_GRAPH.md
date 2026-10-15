@@ -53,6 +53,8 @@ underneath everything.
 | **B9** | Every rule above is named in this document (the check reads this table). |
 | **B10** | Only `com.tunenagi.core.playback` may construct a player or a session: no `androidx.media3.exoplayer` import outside that package, and no `ExoPlayer.Builder`/`MediaSession.Builder`/`MediaLibrarySession.Builder` call anywhere else. The `MediaController` is deliberately *not* restricted — attaching to the session is how the UI is supposed to reach playback. Production sources only: a test may drive a real player to prove the app renders the player's own state (see `NowPlayingTest`). |
 
+| **B11** | A provider adapter (`core.provider.*`) may not import Compose, `core.playback`, `core.plugins` or the networking libraries. Android itself is allowed there and nowhere else in `:core` — reading MediaStore or a SAF grant is what a local provider is *for* — but a provider answers through the domain and the repositories, and never reaches the player, the plugin sandbox or an HTTP client directly. |
+
 ## What the check reads
 
 - Tracked Kotlin files, read from **git's stored content** with `git show :<path>` (the same

@@ -19,6 +19,7 @@ Rules (each is also listed in OPERATIONS/DEPENDENCY_GRAPH.md, and B9 keeps the t
   B8  no data or domain package may import Compose UI, and the design system reaches nothing below
   B9  every rule above is named in OPERATIONS/DEPENDENCY_GRAPH.md
   B10 only com.tunenagi.core.playback may construct a player or a session (production sources)
+  B11 a provider adapter may not import Compose, playback, plugins or the network
 
 **What is read:** the *stored* content (`git show :<path>`) for tracked files, and the working tree
 for files passed with `--paths`, exactly like `check_format.py`, so a CRLF checkout cannot change
@@ -69,6 +70,13 @@ RULES = {
         {"com.tunenagi.core.model", "com.tunenagi.core.database"},
         forbidden(COMPOSE, {"com.tunenagi.core.playback", "com.tunenagi.core.plugins"}),
     ),
+    # A provider adapter is the one layer that is supposed to touch a platform API (MediaStore,
+    # SAF), so Android is not forbidden here - but it may not reach the UI, the player, the plugin
+    # sandbox or the network directly; providers answer through repositories and resolvers.
+    "com.tunenagi.core.provider": (
+        {"com.tunenagi.core.model", "com.tunenagi.core.database", "com.tunenagi.core.library"},
+        forbidden(COMPOSE, NETWORK, {"com.tunenagi.core.playback", "com.tunenagi.core.plugins"}),
+    ),
     "com.tunenagi.core.plugins": (
         {"com.tunenagi.core.model", "com.tunenagi.core.network"},
         forbidden(ANDROID, ROOM, NETWORK, {"com.tunenagi.core.database", "com.tunenagi.core.library"}),
@@ -86,12 +94,13 @@ RULE_ID = {
     "com.tunenagi.core.database": "B2",
     "com.tunenagi.core.playback": "B3",
     "com.tunenagi.core.library": "B4",
+    "com.tunenagi.core.provider": "B11",
     "com.tunenagi.core.plugins": "B5",
     "com.tunenagi.core.designsystem": "B8",
 }
 
 # B9 needs the document to name every rule that exists.
-ALL_RULE_IDS = ("B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10")
+ALL_RULE_IDS = ("B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B11")
 
 APP_PACKAGE = "com.tunenagi.player"
 
@@ -137,6 +146,22 @@ def imports_of(text):
     return IMPORT.findall(text)
 
 
+def rules_for(layer):
+    """The most specific layer rule covering a package.
+
+    Prefix matching, not equality: a rule written for `com.tunenagi.core.model` has to cover
+    `com.tunenagi.core.model.queue` as well, or a sub-package becomes a hole in the gate. The
+    longest match wins so the most specific rule applies when layers nest, and a package with no
+    rule at all is still checked by the rules that are not layer-scoped (B6, B7, B10, B11's sibling
+    checks in `declaration_findings`).
+    """
+    matches = [
+        candidate for candidate in RULES
+        if layer == candidate or layer.startswith(candidate + ".")
+    ]
+    return max(matches, key=len) if matches else None
+
+
 def violations(name, text):
     """Rule violations for one file, as (rule, detail) pairs."""
     normalized = name.replace("\\", "/")
@@ -144,7 +169,7 @@ def violations(name, text):
     layer = layer_of(normalized)
     if layer is None:
         return problems
-    package = layer if layer in RULES else None
+    package = rules_for(layer)
     allowed, forbidden_prefixes = RULES[package] if package is not None else (set(), ())
 
     for imported in imports_of(text):
@@ -299,6 +324,29 @@ def self_test():
     if single_player_findings([controller_in_ui[0]], lambda _name: controller_in_ui[1]):
         failures.append("B10 rejected a controller, which the UI is supposed to use")
 
+    domain_subpackage = ("core/src/main/java/com/tunenagi/core/model/queue/R.kt",
+                         "package com.tunenagi.core.model.queue\n"
+                         "import android.content.Context\n")
+    if not [rule for rule, _ in violations(*domain_subpackage) if rule == "B1"]:
+        failures.append("B1 did not cover a sub-package of the domain layer")
+
+    provider_reading_playback = ("core/src/main/java/com/tunenagi/core/provider/local/P.kt",
+                                 "package com.tunenagi.core.provider.local\n"
+                                 "import com.tunenagi.core.playback.TunenagiPlaybackService\n")
+    if not [rule for rule, _ in violations(*provider_reading_playback) if rule == "B11"]:
+        failures.append("B11 did not fire for a provider adapter importing playback")
+
+    provider_reading_media_store = ("core/src/main/java/com/tunenagi/core/provider/local/Q.kt",
+                                    "package com.tunenagi.core.provider.local\n"
+                                    "import android.provider.MediaStore\n"
+                                    "import android.content.Context\n"
+                                    "import com.tunenagi.core.model.Track\n")
+    if violations(*provider_reading_media_store):
+        failures.append(
+            "B11 rejected a provider adapter, which is supposed to read MediaStore: "
+            + str(violations(*provider_reading_media_store))
+        )
+
     core_gradle = ("core/build.gradle.kts", 'implementation(project(":app"))\n')
     if not [row for row in declaration_findings([core_gradle[0]], lambda _name: core_gradle[1]) if row[1] == "B6"]:
         failures.append("B6 did not fire for :core depending on the :app module")
@@ -309,8 +357,10 @@ def self_test():
         return 1
     print("PASS: boundary gate rejects a domain file importing Android or storage, a data file "
           "importing a higher layer, a plugin importing Room or Context, playback importing the "
-          "library layer, a UI file importing the database, :core depending on :app, and a player "
-          "or session built outside core.playback.")
+          "library layer, a UI file importing the database, :core depending on :app, a player "
+          "or session built outside core.playback, a layer rule reaching into a sub-package, and a "
+          "provider adapter importing playback - while accepting a provider adapter that reads "
+          "MediaStore.")
     return 0
 
 
@@ -329,6 +379,7 @@ def main():
         print("B6 :core must not depend on :app; B7 :app must not import core.database")
         print(f"B9 every rule is named in {GRAPH_DOC}")
         print("B10 only core.playback may construct a player or a session (production sources)")
+        print("B11 a provider adapter may not import Compose, playback, plugins or the network")
         return 0
     if args.self_test:
         return self_test()
