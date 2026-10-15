@@ -18,6 +18,7 @@ Rules (each is also listed in OPERATIONS/DEPENDENCY_GRAPH.md, and B9 keeps the t
       screen cannot bypass a repository
   B8  no data or domain package may import Compose UI, and the design system reaches nothing below
   B9  every rule above is named in OPERATIONS/DEPENDENCY_GRAPH.md
+  B10 only com.tunenagi.core.playback may construct a player or a session (production sources)
 
 **What is read:** the *stored* content (`git show :<path>`) for tracked files, and the working tree
 for files passed with `--paths`, exactly like `check_format.py`, so a CRLF checkout cannot change
@@ -90,9 +91,14 @@ RULE_ID = {
 }
 
 # B9 needs the document to name every rule that exists.
-ALL_RULE_IDS = ("B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9")
+ALL_RULE_IDS = ("B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10")
 
 APP_PACKAGE = "com.tunenagi.player"
+
+# B10: the playback layer owns the one player and the one session.
+PLAYER_LAYER_PATH = "core/src/main/java/com/tunenagi/core/playback/"
+PLAYER_IMPORT = "androidx.media3.exoplayer."
+PLAYER_BUILDER = re.compile(r"\b(?:ExoPlayer|MediaSession|MediaLibrarySession)\.Builder\s*\(")
 
 IMPORT = re.compile(r"^[ \t]*import[ \t]+([A-Za-z0-9_.]+)", re.M)
 SOURCE_PATH = re.compile(r"src/(?:main|test|sharedTest|androidTest)/java/(.+)/[^/]*\.kt$")
@@ -191,6 +197,35 @@ def declaration_findings(files, read):
     return findings
 
 
+def single_player_findings(files, read):
+    """B10: only `core.playback` builds a player or a session.
+
+    `SPEC/ARCHITECTURE.md` says one service owns the sole Media3 player, and the phase-02 document
+    names "player in the Activity" as a trap. Both are statements about where a *constructor* is
+    called, which no single file's review can check. Only production sources are scanned: a test
+    may play a real player to prove the app maps real state (TUN-0201 does exactly that), and
+    forbidding that would trade a real assertion for a rule that only looks strict.
+    """
+    findings = []
+    for name in files:
+        normalized = name.replace("\\", "/")
+        if not normalized.endswith(".kt") or "/src/main/" not in normalized:
+            continue
+        if normalized.startswith(PLAYER_LAYER_PATH):
+            continue
+        text = read(name)
+        if text is None:
+            continue
+        for imported in imports_of(text):
+            if imported.startswith(PLAYER_IMPORT):
+                findings.append((name, "B10",
+                                 f"only core.playback may use a player, and this imports {imported}"))
+        for match in PLAYER_BUILDER.finditer(text):
+            findings.append((name, "B10",
+                             f"only core.playback may build a session or player: {match.group(0)}"))
+    return findings
+
+
 def documentation_findings():
     doc = ROOT / GRAPH_DOC
     if not doc.is_file():
@@ -243,6 +278,27 @@ def self_test():
     if not [row for row in declaration_findings([ui_file[0]], lambda _name: ui_file[1]) if row[1] == "B7"]:
         failures.append("B7 did not fire for a UI file importing the database")
 
+    player_in_ui = ("app/src/main/java/com/tunenagi/player/Y.kt",
+                    "package com.tunenagi.player\nimport androidx.media3.exoplayer.ExoPlayer\n")
+    if not [row for row in single_player_findings([player_in_ui[0]], lambda _name: player_in_ui[1])
+            if row[1] == "B10"]:
+        failures.append("B10 did not fire for a UI file importing ExoPlayer")
+
+    session_in_library = ("core/src/main/java/com/tunenagi/core/library/Z.kt",
+                          "package com.tunenagi.core.library\n"
+                          "val s = MediaSession.Builder(context, player).build()\n")
+    if not [row for row in single_player_findings([session_in_library[0]],
+                                                  lambda _name: session_in_library[1])
+            if row[1] == "B10"]:
+        failures.append("B10 did not fire for a session built outside core.playback")
+
+    controller_in_ui = ("app/src/main/java/com/tunenagi/player/W.kt",
+                        "package com.tunenagi.player\n"
+                        "import androidx.media3.session.MediaController\n"
+                        "val c = MediaController.Builder(context, token).buildAsync()\n")
+    if single_player_findings([controller_in_ui[0]], lambda _name: controller_in_ui[1]):
+        failures.append("B10 rejected a controller, which the UI is supposed to use")
+
     core_gradle = ("core/build.gradle.kts", 'implementation(project(":app"))\n')
     if not [row for row in declaration_findings([core_gradle[0]], lambda _name: core_gradle[1]) if row[1] == "B6"]:
         failures.append("B6 did not fire for :core depending on the :app module")
@@ -253,7 +309,8 @@ def self_test():
         return 1
     print("PASS: boundary gate rejects a domain file importing Android or storage, a data file "
           "importing a higher layer, a plugin importing Room or Context, playback importing the "
-          "library layer, a UI file importing the database, and :core depending on :app.")
+          "library layer, a UI file importing the database, :core depending on :app, and a player "
+          "or session built outside core.playback.")
     return 0
 
 
@@ -271,6 +328,7 @@ def main():
             print(f"{RULE_ID[package]} {package}: allows {allow}; forbids {', '.join(forbidden)}")
         print("B6 :core must not depend on :app; B7 :app must not import core.database")
         print(f"B9 every rule is named in {GRAPH_DOC}")
+        print("B10 only core.playback may construct a player or a session (production sources)")
         return 0
     if args.self_test:
         return self_test()
@@ -285,6 +343,7 @@ def main():
     reader = read if explicit else stored_text
     checked, findings = scan(files, reader)
     findings += declaration_findings(files, reader)
+    findings += single_player_findings(files, reader)
     findings += [(GRAPH_DOC, rule, detail) for rule, detail in documentation_findings()]
 
     if checked == 0:

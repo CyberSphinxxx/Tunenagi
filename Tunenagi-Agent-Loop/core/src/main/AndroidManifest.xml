@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Tunenagi core manifest — owned.
+         The playback component lives here rather than in the app manifest, so the service and
+         the permissions it needs are declared next to the code that requires them and cannot be
+         dropped by an app-manifest edit that does not know about playback. -->
+
+    <!-- A media session service runs in the foreground while audio plays. Android 14 (API 34)
+         additionally requires the media-playback-specific permission; declaring it on older
+         releases is harmless. WAKE_LOCK keeps playback alive with the screen off. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application>
+
+        <!-- The single owner of the Media3 player (TUN-0201).
+
+             `exported="false"` because only this app connects to the session in phase 02: a
+             controller is built against the exact component via a SessionToken, not by asking the
+             PackageManager, so nothing is lost by keeping other apps out. The intent filter is
+             still declared because it is what identifies the component as a media library service
+             to the platform and to Media3's own compatibility layer; opening it to third-party
+             browsers is a deliberate decision with its own task (Android Auto, TUN-0204+) rather
+             than a default. -->
+        <service
+            android:name="com.tunenagi.core.playback.TunenagiPlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+    </application>
+
+</manifest>

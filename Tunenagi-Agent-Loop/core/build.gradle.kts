@@ -85,6 +85,13 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    // Media3. The session API is `api` because the playback layer hands the app a
+    // `MediaController`: the UI attaches to the service through this type, and the app module
+    // must not pin its own Media3 version to do it (one home for each pinned fact). The player
+    // itself stays `implementation` — nothing outside `core.playback` may build one.
+    api(libs.media3.session)
+    implementation(libs.media3.exoplayer)
+
     // Core Kotlin libs
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)

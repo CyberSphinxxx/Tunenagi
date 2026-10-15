@@ -50,13 +50,15 @@ const val NAV_RAIL_TAG = "nav-rail"
  *
  * [layout] and [playerState] are parameters rather than internal state so previews and
  * instrumentation tests can exercise the wide layout and the mini-player without faking a
- * device configuration. Production callers take the defaults, which read the real window
- * width and the (still empty) playback state.
+ * device configuration. Production callers take the defaults, which read the real window width;
+ * the playback state and its command are passed in by the host, so this composable needs neither a
+ * Hilt graph nor a service to render.
  */
 @Composable
 fun TunenagiShell(
     modifier: Modifier = Modifier,
     playerState: MiniPlayerState = MiniPlayerState.None,
+    onTogglePlayPause: () -> Unit = {},
     layout: ShellLayout = TunenagiWindowSize.layoutFor(LocalConfiguration.current.screenWidthDp),
     navController: NavHostController = rememberNavController()
 ) {
@@ -80,7 +82,11 @@ fun TunenagiShell(
             // aside so nothing competes with the transport controls once they exist.
             if (miniPlayerVisible && layout == ShellLayout.Compact) {
                 Column {
-                    MiniPlayerHost(playerState, onExpand = openPlayer)
+                    MiniPlayerHost(
+                        state = playerState,
+                        onExpand = openPlayer,
+                        onTogglePlayPause = onTogglePlayPause
+                    )
                     TunenagiNavigationBar(navController)
                 }
             }
@@ -97,7 +103,11 @@ fun TunenagiShell(
                     modifier = Modifier.weight(1f)
                 )
                 if (miniPlayerVisible && layout == ShellLayout.Wide) {
-                    MiniPlayerHost(playerState, onExpand = openPlayer)
+                    MiniPlayerHost(
+                        state = playerState,
+                        onExpand = openPlayer,
+                        onTogglePlayPause = onTogglePlayPause
+                    )
                 }
             }
         }

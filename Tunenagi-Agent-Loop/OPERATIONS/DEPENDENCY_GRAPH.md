@@ -51,6 +51,7 @@ underneath everything.
 | **B7** | `:app` may not import `com.tunenagi.core.database`: the UI talks to domain interfaces, so no screen can bypass a repository. |
 | **B8** | No data or domain package may import Compose UI, and `core.designsystem` must not reach into storage, library or playback. Design tokens are values, not behaviour. |
 | **B9** | Every rule above is named in this document (the check reads this table). |
+| **B10** | Only `com.tunenagi.core.playback` may construct a player or a session: no `androidx.media3.exoplayer` import outside that package, and no `ExoPlayer.Builder`/`MediaSession.Builder`/`MediaLibrarySession.Builder` call anywhere else. The `MediaController` is deliberately *not* restricted — attaching to the session is how the UI is supposed to reach playback. Production sources only: a test may drive a real player to prove the app renders the player's own state (see `NowPlayingTest`). |
 
 ## What the check reads
 
@@ -64,8 +65,9 @@ underneath everything.
 Run it directly with `python SCRIPTS/check_boundaries.py`, list the rules with `--list`, or prove it
 can fail with `--self-test` (it does: the self-test feeds it a domain file importing Android, a data
 file importing a higher layer, a plugin importing Room and Context, playback importing the library
-layer, a UI file importing the database, and `:core` declaring a dependency on `:app`). It is step
-`boundaries` of `SCRIPTS/verify.py`, and therefore also a step of CI.
+layer, a UI file importing the database, `:core` declaring a dependency on `:app`, an `ExoPlayer`
+imported by the UI and a session built outside `core.playback` — while accepting a `MediaController`
+in the UI). It is step `boundaries` of `SCRIPTS/verify.py`, and therefore also a step of CI.
 
 ## Changing a rule
 
