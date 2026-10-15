@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import com.tunenagi.player.ui.playback.rememberPlaybackUi
 import com.tunenagi.player.ui.shell.TunenagiShell
 import com.tunenagi.player.ui.theme.TunenagiTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -15,9 +16,10 @@ import dagger.hilt.android.AndroidEntryPoint
 /**
  * Tunenagi main activity — owned.
  *
- * Host for the Compose shell: three tabs, the player route and the mini-player slot. It
- * holds no navigation state of its own, so the shell survives configuration changes and
- * the player route can later be driven from a media session without touching the activity.
+ * Host for the Compose shell: three tabs, the player route and the mini-player slot. It holds no
+ * navigation state of its own, so the shell survives configuration changes, and it owns no player:
+ * the playback state and the transport command come from the playback view model, which is bound to
+ * the media session service. This activity never imports a Media3 player type.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -30,7 +32,11 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    TunenagiShell()
+                    val playback = rememberPlaybackUi()
+                    TunenagiShell(
+                        playerState = playback.state,
+                        onTogglePlayPause = playback.onTogglePlayPause
+                    )
                 }
             }
         }

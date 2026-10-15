@@ -329,9 +329,16 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0201\\20261015T195612Z-clean-build-and-all-jvm-tests.json",
+        "STATE\\evidence\\TUN-0201\\20261015T195434Z-verify-all-steps.json",
+        "STATE\\evidence\\TUN-0201\\20261015T195042Z-playback-tests-after-release-fix.json",
+        "STATE\\evidence\\TUN-0201\\20261013T211402Z-service-tests.json",
+        "STATE\\evidence\\TUN-0201\\20261013T213341Z-boundary-gate-single-player.json",
+        "STATE\\evidence\\TUN-0201\\20261013T213345Z-boundary-self-test-single-player.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-15T19:59:56+00:00; semantic review still required."
     },
     {
       "id": "TUN-0202",

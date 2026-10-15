@@ -383,3 +383,40 @@ export directory is skipped, and the reason is written in the script and audited
 every future schema version, the phase-01 audit.
 
 **Owner review needed?** No: no product behaviour and no hand-written file's rule changed.
+
+## ADR-011 - A single player is enforced by a gate, not by a comment (2026-10-14)
+
+**Context**: `SPEC/ARCHITECTURE.md` requires one service that owns the sole Media3 player, and
+`PHASES/02-local-media-and-robust-playback.md` names "player in the Activity" as one of the traps a
+phase-02 audit must look for. Nothing in the project could fail a build when it happened: the rule
+lived in prose, and a `ExoPlayer.Builder(context).build()` inside a composable or an Activity would
+compile, pass every test, and produce two players competing for the audio output on a device.
+
+**Options**: (a) rely on review and the audit; (b) restrict `:core`'s Media3 dependency to
+`implementation` so the app cannot name a player (it cannot import `ExoPlayer` either way, and this
+already happens for `media3-exoplayer`); (c) add rule **B10** to the existing dependency-direction
+gate: only `com.tunenagi.core.playback` may import `androidx.media3.exoplayer` or construct an
+`ExoPlayer`/`MediaSession`/`MediaLibrarySession` builder.
+
+**Decision**: (c), together with (b), which was already true. B10 scans **production sources only**
+(`src/main`): a *test* may drive a real player, which TUN-0201's `NowPlayingTest` deliberately does,
+because the claim it checks is that the app renders the player's own state and a fake player could
+not check it. `MediaController` is not restricted — attaching to the session is exactly how the UI
+is supposed to reach playback.
+
+**Consequences**:
+- The rule catches the fully-qualified case (`MediaSession.Builder(...)` with no import) as well as
+  the import, so "just don't import it" is not a way around the gate.
+- `check_boundaries.py --self-test` gained two positive cases (an `ExoPlayer` import in the UI, a
+  session built in `core.library`) and one negative case (a `MediaController` in the UI must be
+  accepted), so B10 cannot pass by rejecting everything.
+- `OPERATIONS/DEPENDENCY_GRAPH.md` gained the B10 row in the same change: B9 fails the gate if the
+  document and the script disagree, which is what keeps this decision attached to the rule.
+- The app module keeps `media3-exoplayer` as a *test*-only dependency. That is what makes B10 a
+  meaningful rule rather than a coincidence of dependency resolution.
+
+**Affected tasks**: TUN-0201 (the player and the rule), TUN-0107 (the gate's owner), the phase-02
+audit, and every later task that touches playback.
+
+**Owner review needed?** No: no product behaviour changed, and the rule only removes a way to
+violate an existing architectural requirement.

@@ -28,4 +28,9 @@
     <string name="player_close">Close player</string>
     <string name="player_empty_title">Nothing is playing</string>
     <string name="player_empty_message">Choose a track from Home, Search or your Library to start playback.</string>
+
+    <!-- Mini-player transport. The labels are the accessible names of the controls, so they
+         describe the action the control performs, not the current state. -->
+    <string name="mini_player_play">Play</string>
+    <string name="mini_player_pause">Pause</string>
 </resources>

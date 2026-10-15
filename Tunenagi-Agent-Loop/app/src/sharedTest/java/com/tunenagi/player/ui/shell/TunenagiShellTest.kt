@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -15,6 +16,7 @@ import com.tunenagi.player.ui.screens.PLAYER_SCREEN_TAG
 import com.tunenagi.player.ui.screens.SEARCH_FIELD_TAG
 import com.tunenagi.player.ui.screens.SEARCH_SCREEN_TAG
 import com.tunenagi.player.ui.theme.TunenagiTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,11 +41,16 @@ class TunenagiShellTest {
 
     private fun setShell(
         playerState: MiniPlayerState = MiniPlayerState.None,
-        layout: ShellLayout = ShellLayout.Compact
+        layout: ShellLayout = ShellLayout.Compact,
+        onTogglePlayPause: () -> Unit = {}
     ) {
         compose.setContent {
             TunenagiTheme {
-                TunenagiShell(playerState = playerState, layout = layout)
+                TunenagiShell(
+                    playerState = playerState,
+                    onTogglePlayPause = onTogglePlayPause,
+                    layout = layout
+                )
             }
         }
     }
@@ -127,6 +134,35 @@ class TunenagiShellTest {
 
         compose.onAllNodesWithTag(MINI_PLAYER_TAG).assertCountEquals(1)
         compose.onAllNodesWithTag(NAV_RAIL_TAG).assertCountEquals(1)
+    }
+
+    /**
+     * The transport control is real: it commands the playback source the host passed in, and its
+     * accessible name follows the state, so the bar never tells a screen-reader user that a playing
+     * track is paused.
+     */
+    @Test
+    fun theMiniPlayerOffersATransportControlThatCommandsThePlaybackSource() {
+        var toggles = 0
+        setShell(
+            playerState = MiniPlayerState.Track("Slow Tide", "Kaori Ito", isPlaying = true),
+            onTogglePlayPause = { toggles++ }
+        )
+
+        compose.onNodeWithContentDescription("Pause").assertIsDisplayed()
+        compose.onNodeWithTag(MINI_PLAYER_TOGGLE_TAG).performClick()
+
+        assertEquals(1, toggles)
+    }
+
+    @Test
+    fun theTransportControlOffersPlayWhileNothingIsPlaying() {
+        setShell(
+            playerState = MiniPlayerState.Track("Slow Tide", "Kaori Ito", isPlaying = false)
+        )
+
+        compose.onNodeWithContentDescription("Play").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Pause").assertDoesNotExist()
     }
 
     @Test

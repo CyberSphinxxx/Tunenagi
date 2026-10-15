@@ -26,6 +26,19 @@
       "resolution": "Added DatabaseConstraintTest.deletingASourceLeavesTheTrackCreditsAndPlaylistsIntact: it removes the track_sources row outright and asserts the track, its credit row, its playlist entry and its favourite all survive, and that the track's source count drops to zero. Retest: the :core::database suite ran green (exit 0) with the new test included.",
       "evidence": "STATE\\evidence\\TUN-0102\\20261013T203306Z-source-loss-regression.json",
       "closedUtc": "2026-10-13T20:34:22+00:00"
+    },
+    {
+      "id": "BUG-0003",
+      "phase": "02",
+      "relatedTask": "TUN-0201",
+      "severity": "Medium",
+      "status": "closed",
+      "title": "A disconnect while the controller was still binding left the app permanently Closed",
+      "reproduction": "PlaybackConnection.disconnect() released through controller?.let { ... }, so while a MediaController was still binding (controller == null, controllerFuture != null) it released nothing: controllerFuture survived, and every later connect() returned early on if (controllerFuture != null). The connection then stayed Closed for the rest of the process with the service binding still held, and only an app restart could recover. onError() had the same shape: it reported Failed and left an attached controller in place. Found while writing the teardown test; proved by mutation - reverting disconnect() to the guarded form makes NowPlayingTest.disconnectingWhileConnectingLetsTheNextConnectTryAgain fail with expected:<Connecting> but was:<Closed> (STATE/evidence/TUN-0201/20261015T194929Z-old-disconnect-mutation-fails.json, exit 1).",
+      "foundUtc": "2026-10-15T19:59:45+00:00",
+      "resolution": "All three teardown paths (explicit disconnect, service disconnect, session error) now release through one private controllerRelease() that clears both the attached controller and the pending future, and is idempotent. Retest: :app:testDebugUnitTest --tests NowPlayingTest --rerun-tasks -> exit 0, 6 tests / 0 failures, including the new regression test that fails against the old code. Full gate re-run afterwards: python SCRIPTS/verify.py -> exit 0, 9/9 steps.",
+      "evidence": "STATE\\evidence\\TUN-0201\\20261015T195042Z-playback-tests-after-release-fix.json",
+      "closedUtc": "2026-10-15T19:59:45+00:00"
     }
   ]
 }

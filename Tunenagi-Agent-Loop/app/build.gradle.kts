@@ -104,8 +104,9 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
-    // Media3 playback surface (wired to real playback in the audio-engine task)
-    implementation(libs.media3.exoplayer)
+    // Media3 playback surface. The player lives in `:core`; the app only attaches a
+    // `MediaController` to the service, and `media3-session` reaches it through core's `api`
+    // declaration so the Media3 version is pinned in exactly one place.
 
     // Core Kotlin libs
     implementation(libs.kotlinx.coroutines.core)
@@ -121,6 +122,13 @@ dependencies {
     ksp(libs.room.compiler)
 
     testImplementation(libs.junit)
+    // The playback view model owns a coroutine scope; the state it publishes is asserted on a
+    // controlled dispatcher rather than by waiting on a real clock.
+    testImplementation(libs.kotlinx.coroutines.test)
+    // A real ExoPlayer, for the test that proves the app maps the *player's* state rather than an
+    // intention. It is test-only on purpose: production code in this module must not be able to
+    // import a player, and the boundary gate enforces that for `src/main`.
+    testImplementation(libs.media3.exoplayer)
     // JVM-hosted Android runtime for the shared Compose UI tests (no device required).
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)

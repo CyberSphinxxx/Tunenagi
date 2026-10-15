@@ -333,3 +333,66 @@ below is the original entry's content.
   coverage is now asserted by tests, but only the checks listed above were re-derived independently.
 - **Next exact action**: phase 02 - the Media3 playback service and local playback path
   (`python SCRIPTS/taskctl.py next` to confirm eligibility).
+
+## 2026-10-14T04:35Z - Codebuff session (phase 02, TUN-0201)
+
+- **Phase/tasks**: TUN-0201 verified (phase 02, 1/8). `python SCRIPTS/taskctl.py next` now points at
+  TUN-0202 (local media discovery).
+- **What was built**: the app now has exactly one player. `core.playback.TunenagiPlaybackService` is
+  a real `MediaLibraryService` whose `onCreate` builds one `TunenagiPlaybackEngine` (a real
+  `ExoPlayer` with `USAGE_MEDIA`/`CONTENT_TYPE_MUSIC` and `handleAudioFocus = true`) and one
+  `MediaLibrarySession` over it, handing the same session to every controller; `onDestroy` releases
+  both. The app reaches playback only through `PlaybackConnection`, a bound `MediaController` named
+  by a `SessionToken`, and the mini-player now shows the session's real state with a working
+  play/pause control. The service and the permissions it needs are declared in the core module's
+  manifest so playback cannot be dropped by an unrelated app-manifest edit.
+- **A new rule, because a comment is not enforcement**: `SCRIPTS/check_boundaries.py` gained **B10**
+  (only `core.playback` may import `androidx.media3.exoplayer` or build an
+  `ExoPlayer`/`MediaSession`/`MediaLibrarySession`), with a self-test case for each direction and a
+  matching row in `OPERATIONS/DEPENDENCY_GRAPH.md`. Recorded as ADR-011. This is what turns the
+  phase's "player in the Activity" trap into something a build can fail on.
+- **Commands and exit codes (evidence paths)** - all re-run against the final code, because the
+  first version of this task was verified with an evidence manifest that predated three fixes:
+  - `python SCRIPTS/verify.py` -> exit 0, all 9 steps green (package, format, secrets,
+    ci-definition, boundaries, unit-tests, assemble, lint, lint-report)
+    (`STATE/evidence/TUN-0201/20261015T195434Z-verify-all-steps.json`).
+  - `bash gradlew clean :core:testDebugUnitTest :app:testDebugUnitTest :app:assembleDebug
+    :app:assembleDebugAndroidTest --no-build-cache` -> exit 0, 123 tasks, 2m51s
+    (`.../20261015T195612Z-clean-build-and-all-jvm-tests.json`). Earlier attempts that exited 1 are
+    kept, not deleted: one because a leftover lint worker still held
+    `app/build/intermediates/lint-cache` (daemons stopped, lint caches removed, run repeated), and
+    the mutation run below, which is supposed to fail.
+  - `:app:testDebugUnitTest --tests NowPlayingTest --rerun-tasks` against the *old* disconnect ->
+    exit 1, `AssertionError: ... expected:<Connecting> but was:<Closed>`
+    (`.../20261015T194929Z-old-disconnect-mutation-fails.json`); the same command with the fix in
+    place -> exit 0, 6 tests (`.../20261015T195042Z-playback-tests-after-release-fix.json`). That
+    pair is the evidence for BUG-0003.
+  - `:core:testDebugUnitTest --tests TunenagiPlaybackServiceTest` -> exit 0, 9 tests;
+    `python SCRIPTS/check_boundaries.py` -> exit 0 (53 files); `--self-test` -> exit 0 with both
+    B10 directions firing and a `MediaController` in the UI still accepted.
+  - `bash gradlew :app:lintDebug :core:lintDebug` failed on the first attempt of this task, and the
+    two causes were fixed in the source rather than baselined: four `UnsafeOptInUsageError`s in
+    `PlaybackConnection.kt` (`MediaController.Builder(...)`, `releaseFuture`) and one new
+    `ModifierParameter` warning in `MiniPlayer.kt` (`modifier` must be the first optional
+    parameter). `python SCRIPTS/verify.py --only lint --only lint-report` -> exit 0.
+- **A leak fixed before it shipped (BUG-0003)**: `disconnect()` released the controller only when
+  one had already *attached*, so a disconnect while the controller was still binding released
+  nothing, kept the pending future, and every later `connect()` short-circuited on it - the app
+  stayed `Closed` for the rest of the process with a bound service still behind it. `onError` had
+  the same shape: it reported `Failed` and left the controller attached. All three paths now leave
+  through one `controllerRelease()`, and `NowPlayingTest` fails against the old code (above).
+- **Test totals now**: 177 JVM tests (`:core` 152 across 14 classes, `:app` 25 across 4),
+  0 failures. The app's 25 are `NowPlayingTest` 6 (`:core` counts are unchanged by this task's later
+  fixes).
+- **Device / emulator observations**: none possible (no device, no hypervisor driver), so the
+  substitute is stated rather than implied: the tests drive a **real** `ExoPlayer`, a real
+  `MediaLibrarySession` and the real merged manifest under Robolectric, and they prove the state
+  machine, the identity invariants, the failure paths and the declarations. They do **not** prove
+  codecs, audio focus, background survival, the notification or lockscreen controls - all of that is
+  in `OPERATIONS/DEFERRED_VERIFICATION.md` (ADR-008), and the task note records the substitution.
+- **Blockers or risks**: unchanged standing deferral; plus the honest limit of TUN-0201 - no sound
+  has been produced by this project yet, because local media discovery is TUN-0202/0203. The
+  connection's *successful* binding path is asserted only as far as the JVM allows (the state is
+  `Connecting`, not `Connected`, without a device): the same deferral ADR-008 records.
+- **Next exact action**: TUN-0202 - discover rights-cleared local media through MediaStore and SAF
+  grants, and handle revocation and unavailable files.

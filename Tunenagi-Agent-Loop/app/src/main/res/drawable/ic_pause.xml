@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pause glyph for the mini-player transport control — owned.
+
+     Drawn here rather than pulled in from `material-icons-extended`: the core icon set has
+     `PlayArrow` but no `Pause`, and adding the extended icon library (thousands of vectors) for a
+     single two-rectangle glyph would be a large dependency for a small need. `Icon` tints the
+     painter with the local content colour, so this file carries no colour of its own. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7,5h3.5v14H7zM13.5,5H17v14h-3.5z" />
+</vector>
