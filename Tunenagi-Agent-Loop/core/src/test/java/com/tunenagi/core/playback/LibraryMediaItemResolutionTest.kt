@@ -315,14 +315,135 @@ class LibraryMediaItemResolutionTest {
     @Test
     fun theMediaIdConventionRoundTripsAndRejectsForeignIds() {
         val id = TrackSourceId.random()
+        val trackId = TrackId.random()
 
         assertEquals(id, MediaItemIds.sourceIdOrNull(MediaItemIds.source(id)))
         assertEquals("tunenagi:source:" + id.value, MediaItemIds.source(id))
+        assertEquals(trackId, MediaItemIds.trackIdOrNull(MediaItemIds.track(trackId)))
+        assertEquals("tunenagi:track:" + trackId.value, MediaItemIds.track(trackId))
         assertNull(MediaItemIds.sourceIdOrNull(null))
         assertNull(MediaItemIds.sourceIdOrNull(""))
         assertNull(MediaItemIds.sourceIdOrNull("local:1"))
         assertNull(MediaItemIds.sourceIdOrNull("tunenagi:source:not-a-uuid"))
         assertNull("a bare uuid is not an id this app issued", MediaItemIds.sourceIdOrNull(id.value))
+        // The two kinds must not be confused for one another, or a queue item would resolve as
+        // whichever id happens to parse first.
+        assertNull(MediaItemIds.trackIdOrNull(MediaItemIds.source(id)))
+        assertNull(MediaItemIds.sourceIdOrNull(MediaItemIds.track(trackId)))
+    }
+
+    // ---- track-level ids and the source a track plays through -------------------------------------
+
+    /**
+     * A queue holds tracks, not sources (`SPEC/DATA_MODEL.md`), so a track-level media id has to
+     * choose a source at resolve time - and the chosen one is what the resolver is asked about.
+     */
+    private suspend fun seedTwoSources(
+        preferredLocked: Boolean?,
+        preferredAvailability: SourceAvailability,
+        otherAvailability: SourceAvailability
+    ): Pair<TunenagiDatabase, String> {
+        val database = Fixtures.database()
+        val track = Track(id = TrackId.random(), title = "Slow Tide", durationMs = 190_000)
+        database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at))
+        val sources = listOf(
+            TrackSource(
+                id = TrackSourceId.random(),
+                trackId = track.id,
+                providerId = ProviderId.Local,
+                externalId = "7",
+                localUri = MEDIA_URI,
+                sourceVariant = "mediastore",
+                contentType = "audio/mpeg",
+                availability = preferredAvailability,
+                preferred = preferredLocked != null,
+                locked = preferredLocked == true
+            ),
+            TrackSource(
+                id = TrackSourceId.random(),
+                trackId = track.id,
+                providerId = ProviderId.Local,
+                externalId = "8",
+                localUri = "content://media/external/audio/media/8",
+                sourceVariant = "mediastore",
+                contentType = "audio/mpeg",
+                availability = otherAvailability,
+                lastCheckedAt = at
+            )
+        )
+        sources.forEach { database.sourceDao().insert(TunenagiMappers.toTrackSourceEntity(it)) }
+        return database to track.id.value
+    }
+
+    @Test
+    fun aTrackIdResolvesThroughItsPreferredSource() = runBlocking {
+        val (database, trackId) = seedTwoSources(
+            preferredLocked = false,
+            preferredAvailability = SourceAvailability.Available,
+            otherAvailability = SourceAvailability.Available
+        )
+        val resolver = StubResolver(
+            answer = ResolveResult.Resolved(PlayableReference(MEDIA_URI, "audio/mpeg", TrackSourceId.random()))
+        )
+        val requested = MediaItem.Builder().setMediaId(MediaItemIds.track(TrackId.parse(trackId))).build()
+
+        val resolved = resolution(database, resolver).resolve(listOf(requested)).value().single()
+
+        assertEquals(trackId, MediaItemIds.trackIdOrNull(resolved.mediaId)!!.value)
+        assertEquals("the preferred source is the one asked about", "7", resolver.calls.single().second.externalId)
+    }
+
+    @Test
+    fun anUnavailablePreferredSourceFallsBackToAnotherCopyOfTheSameRecording() = runBlocking {
+        val (database, trackId) = seedTwoSources(
+            preferredLocked = false,
+            preferredAvailability = SourceAvailability.StorageGone,
+            otherAvailability = SourceAvailability.Available
+        )
+        val resolver = StubResolver(
+            answer = ResolveResult.Resolved(
+                PlayableReference("content://media/external/audio/media/8", "audio/mpeg", TrackSourceId.random())
+            )
+        )
+        val requested = MediaItem.Builder().setMediaId(MediaItemIds.track(TrackId.parse(trackId))).build()
+
+        resolution(database, resolver).resolve(listOf(requested)).value()
+
+        assertEquals("8", resolver.calls.single().second.externalId)
+    }
+
+    /**
+     * A locked source is the user's explicit choice (TUN-0104). Reporting it as unplayable is
+     * honest; quietly playing a different copy is the substitution `SPEC/PROVIDERS.md` forbids.
+     */
+    @Test
+    fun aSourceTheUserLockedIsUsedEvenWhenAnotherCopyIsAvailable() = runBlocking {
+        val (database, trackId) = seedTwoSources(
+            preferredLocked = true,
+            preferredAvailability = SourceAvailability.StorageGone,
+            otherAvailability = SourceAvailability.Available
+        )
+        val resolver = StubResolver(answer = ResolveResult.NeedsUserAction(SourceAvailability.StorageGone))
+        val requested = MediaItem.Builder().setMediaId(MediaItemIds.track(TrackId.parse(trackId))).build()
+
+        val failure = resolution(database, resolver).resolve(listOf(requested)).failure()
+
+        assertEquals("7", resolver.calls.single().second.externalId)
+        assertEquals(SourceAvailability.StorageGone, (failure as UnresolvedMediaItemException).availability)
+    }
+
+    @Test
+    fun aTrackWithNoSourceAtAllFailsTypedInsteadOfGuessingOne() = runBlocking {
+        val database = Fixtures.database()
+        val track = Track(id = TrackId.random(), title = "Sourceless")
+        database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at))
+        val resolver = StubResolver()
+        val requested = MediaItem.Builder().setMediaId(MediaItemIds.track(track.id)).build()
+
+        val failure = resolution(database, resolver).resolve(listOf(requested)).failure()
+
+        assertTrue((failure as UnresolvedMediaItemException).source!!.contains("no source in the library"))
+        assertTrue(resolver.calls.isEmpty())
     }
 
     private companion object {

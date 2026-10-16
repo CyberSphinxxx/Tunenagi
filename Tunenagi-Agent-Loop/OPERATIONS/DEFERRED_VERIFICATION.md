@@ -21,6 +21,7 @@ A substitute is used for the parts that can honestly be substituted, and nothing
 | Compose UI behaviour | `src/sharedTest` Compose tests executed on the JVM by Robolectric (`:app:testDebugUnitTest`) | real composition, real navigation graph, real semantics tree, real assertions | device insets/cutouts, OEM theming, GPU rendering, input latency, TalkBack |
 | Audio playback | `Media3` `ExoPlayer` driven through a `TestPlayer`/fake renderer in JVM tests | state machine, queue transitions, error mapping, state restoration | real codecs, real audio focus, real background service survival, lockscreen |
 | Local source resolution (TUN-0203) | real header bytes supplied to the real sniffer and resolver, plus a real Room database with the real unique indices | the container decision from bytes, the typed errors for unsupported/gone/denied, the format and availability written back, the media-id convention | opening a file through a real `ContentResolver`/MediaStore/SAF grant, and a device decoder actually accepting the container the header announced |
+| Queue commands and transitions (TUN-0204) | the real `PlaybackQueueCommands` driven against a **real** `ExoPlayer` and a real Room database, asserting the player's own queue, current index, `playWhenReady`, repeat/shuffle state and the persisted snapshot | that a `next`/`previous`/`remove`/`move`/`shuffle` really changes what is stored and what the player will play, including the 3-second Previous threshold and repeat/shuffle policies | that audio plays, that a seek lands where the user *hears* it, that an edit is gapless, or that the queue survives process death; the fixture uri points at no file and no decoder is involved |
 | Provider integration | MockWebServer fixtures of the real payloads | request shape, parsing, error/rate-limit mapping, retry policy | live network, real catalog contents, upstream policy/entitlement changes |
 | Storage | Room in-memory + migration tests on the JVM | schema, DAO queries, migration correctness | real on-device storage behaviour, process death, large real libraries |
 | Live third-party smoke | none | — | an actual Audius/LRCLIB/MusicBrainz request never happened; no live artifact exists |
@@ -59,6 +60,16 @@ A substitute is used for the parts that can honestly be substituted, and nothing
   deliberately visible rather than silent - a session with nothing installed refuses an item it
   cannot resolve on its own instead of playing something else - but the residual risk is real and is
   noted here rather than assumed away.
+- **The queue command surface (TUN-0204)**: the commands exist, are built by the service over its own
+  player, and are exercised end to end against a real `ExoPlayer` and a real Room database. What no
+  JVM test can show is what the user experiences: that pressing Next *sounds* like the next track,
+  that the 3-second Previous threshold matches what a listener expects when they hear it, that a
+  reorder during playback does not glitch audibly, and that Media3's session routes a hardware or
+  lockscreen control into the same command. Also outstanding by design: nothing in the UI can reach
+  these commands yet - the UI-facing transport (custom session commands or a controller-side facade)
+  is scheduled with the queue UI in TUN-0703, because Media3's controller surface cannot express the
+  previous-threshold or materialised-shuffle policies. Until then this is a verified session-side
+  capability, not a user-visible feature, and the phase-02 audit must read it that way.
 
 ## Rule for later sessions (do not drift)
 

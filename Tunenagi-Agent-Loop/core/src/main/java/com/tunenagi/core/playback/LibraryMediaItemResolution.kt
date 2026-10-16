@@ -12,6 +12,7 @@ import com.tunenagi.core.model.PlaybackSourceResolver
 import com.tunenagi.core.model.ResolveResult
 import com.tunenagi.core.model.SourceAvailability
 import com.tunenagi.core.model.Track
+import com.tunenagi.core.model.TrackId
 import com.tunenagi.core.model.TrackSourceId
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
@@ -36,15 +37,34 @@ object MediaItemIds {
     /** Prefixed form of a source id, as it appears in [MediaItem.mediaId]. */
     const val SOURCE_PREFIX = "tunenagi:source:"
 
+    /**
+     * Prefixed form of a *track* id: "play this recording, from whichever source is best now".
+     *
+     * A queue holds tracks, not sources (`SPEC/DATA_MODEL.md`: a source may disappear while the
+     * track stays), so this is what a queue item becomes. Which source actually plays is decided at
+     * resolve time by the preferred/locked flags, which is exactly the "resolve late" rule - a
+     * source chosen when the queue was built would be the wrong one by the time it plays.
+     */
+    const val TRACK_PREFIX = "tunenagi:track:"
+
     /** The media id that plays one library source. */
     fun source(id: TrackSourceId): String = SOURCE_PREFIX + id.value
 
+    /** The media id that plays a track through its preferred source. */
+    fun track(id: TrackId): String = TRACK_PREFIX + id.value
+
     /** The source id an item names, or `null` when the id is not one this app issued. */
-    fun sourceIdOrNull(mediaId: String?): TrackSourceId? {
-        if (mediaId == null || !mediaId.startsWith(SOURCE_PREFIX)) return null
-        val raw = mediaId.removePrefix(SOURCE_PREFIX)
+    fun sourceIdOrNull(mediaId: String?): TrackSourceId? =
+        uuidAfter(mediaId, SOURCE_PREFIX, TrackSourceId::parse)
+
+    /** The track id an item names, or `null` when the id is not one this app issued. */
+    fun trackIdOrNull(mediaId: String?): TrackId? =
+        uuidAfter(mediaId, TRACK_PREFIX, TrackId::parse)
+
+    private fun <T> uuidAfter(mediaId: String?, prefix: String, parse: (String) -> T): T? {
+        if (mediaId == null || !mediaId.startsWith(prefix)) return null
         // A parsing failure is a rejection, not a crash: this value arrives from another process.
-        return runCatching { TrackSourceId.parse(raw) }.getOrNull()
+        return runCatching { parse(mediaId.removePrefix(prefix)) }.getOrNull()
     }
 }
 
@@ -52,9 +72,10 @@ object MediaItemIds {
  * Resolves a requested item out of the on-device library — owned.
  *
  * This is the object that makes local playback real: the session hands it an item whose media id is
- * a [TrackSourceId], and it finds the track and source in Room, asks the resolver registered for
- * that source's provider for a fresh [com.tunenagi.core.model.PlayableReference], and returns an
- * item the player can open — or a typed failure that says which part was missing.
+ * a [TrackSourceId] or a track id, it finds the track and source in Room, asks the resolver
+ * registered for that source's provider for a fresh
+ * [com.tunenagi.core.model.PlayableReference], and returns an item the player can open — or a typed
+ * failure that says which part was missing.
  *
  * Three choices are worth naming:
  *
@@ -101,9 +122,13 @@ class LibraryMediaItemResolution(
         if (requested.localConfiguration?.uri != null) return requested
 
         val sourceId = MediaItemIds.sourceIdOrNull(requested.mediaId)
-            ?: throw UnresolvedMediaItemException(requested.mediaId, NOT_A_SOURCE_ID)
-        val stored = database.sourceDao().byId(sourceId.value)
-            ?: throw UnresolvedMediaItemException(requested.mediaId, UNKNOWN_SOURCE)
+        val trackId = MediaItemIds.trackIdOrNull(requested.mediaId)
+        val stored = when {
+            sourceId != null -> database.sourceDao().byId(sourceId.value)
+                ?: throw UnresolvedMediaItemException(requested.mediaId, UNKNOWN_SOURCE)
+            trackId != null -> preferredSourceFor(requested.mediaId, trackId)
+            else -> throw UnresolvedMediaItemException(requested.mediaId, NOT_A_SOURCE_ID)
+        }
         val storedTrack = database.trackDao().byId(stored.trackId)
             ?: throw UnresolvedMediaItemException(requested.mediaId, MISSING_TRACK)
         val resolver = resolvers.firstOrNull { it.providerId.value == stored.providerId }
@@ -133,6 +158,32 @@ class LibraryMediaItemResolution(
                 error = result.error
             )
         }
+    }
+
+    /**
+     * Picks the source a track-level media id plays.
+     *
+     * The rules come from `SPEC/PROVIDERS.md` and the manual-lock contract:
+     *
+     * - a source the user **locked** is honoured even when it is not available: reporting it as
+     *   unplayable is honest, and silently playing a different copy would be the substitution the
+     *   spec forbids;
+     * - otherwise the preferred source wins when it is available, and any other available source of
+     *   the *same recording* may stand in when it is not - that is what several sources are for;
+     * - if nothing is available the preferred (or first) source is returned so the failure names a
+     *   real source instead of being invented.
+     */
+    private suspend fun preferredSourceFor(mediaId: String, trackId: TrackId): TrackSourceEntity {
+        val sources = database.sourceDao().forTrack(trackId.value)
+        if (sources.isEmpty()) throw UnresolvedMediaItemException(mediaId, NO_SOURCE_FOR_TRACK)
+        val preferred = sources.firstOrNull { it.preferred }
+        if (preferred != null && preferred.locked) return preferred
+        if (preferred != null && preferred.availability == SourceAvailability.Available.name) {
+            return preferred
+        }
+        return sources.firstOrNull { it.availability == SourceAvailability.Available.name }
+            ?: preferred
+            ?: sources.first()
     }
 
     /** Records what a successful resolve proved: the file is readable, and this is the container. */
@@ -194,5 +245,6 @@ class LibraryMediaItemResolution(
         const val NOT_A_SOURCE_ID = "the media id is not a Tunenagi source id"
         const val UNKNOWN_SOURCE = "this source is not in the library"
         const val MISSING_TRACK = "the source's track is not in the library"
+        const val NO_SOURCE_FOR_TRACK = "this track has no source in the library"
     }
 }

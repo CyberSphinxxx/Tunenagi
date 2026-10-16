@@ -406,9 +406,11 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0204\\20261016T174346Z-verify-all-steps-and-boundary-gate.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-16T17:50:15+00:00; semantic review still required."
     },
     {
       "id": "TUN-0205",

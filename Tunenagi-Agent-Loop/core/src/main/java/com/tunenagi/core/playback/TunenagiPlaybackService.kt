@@ -41,7 +41,18 @@ open class TunenagiPlaybackService : MediaLibraryService() {
      * is created by the OS, so it has no constructor to be handed one (ADR-013). Reading it here
      * means the session and its callback cannot disagree about how a media id is resolved.
      */
-    internal val sessionCallback = TunenagiMediaLibraryCallback(PlaybackResolution.current())
+    internal val sessionCallback = TunenagiMediaLibraryCallback(PlaybackResolution.current().resolution)
+
+    /**
+     * The queue commands this session applies, or `null` when the host installed no library.
+     *
+     * Built from the same graph the callback resolves through, so the two cannot disagree about
+     * which library they are working on. It needs the engine, which is why it is created in
+     * [onCreate] rather than beside the callback — and why it is dropped again in [onDestroy], since
+     * a command that outlived its player could seek something that no longer exists.
+     */
+    internal var queueCommands: PlaybackQueueCommands? = null
+        private set
 
     /** The engine this service owns, or `null` before [onCreate] / after [onDestroy]. */
     internal val ownedEngine: TunenagiPlaybackEngine? get() = engine
@@ -56,6 +67,14 @@ open class TunenagiPlaybackService : MediaLibraryService() {
         super.onCreate()
         val playbackEngine = TunenagiPlaybackEngine(this)
         engine = playbackEngine
+        val graph = PlaybackResolution.current()
+        queueCommands = graph.queue?.let { queue ->
+            PlaybackQueueCommands(
+                player = playbackEngine.player,
+                queue = queue,
+                resolution = graph.resolution
+            )
+        }
         library = MediaLibraryService.MediaLibrarySession.Builder(
             this,
             playbackEngine.player,
@@ -81,6 +100,7 @@ open class TunenagiPlaybackService : MediaLibraryService() {
         engine?.release()
         library = null
         engine = null
+        queueCommands = null
         super.onDestroy()
     }
 

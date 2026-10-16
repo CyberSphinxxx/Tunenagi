@@ -521,3 +521,66 @@ below is the original entry's content.
   by the app's graph rather than by a user tapping play (that is TUN-0204).
 - **Next exact action**: TUN-0204 - next/previous/seeking, add/remove/reorder, shuffle and repeat with
   bounded behaviour and state-transition tests.
+
+## 2026-10-16T17:50Z - Codebuff session (phase 02, TUN-0204)
+
+- **Phase/tasks**: TUN-0204 verified (phase 02, 4/8). `python SCRIPTS/taskctl.py next` now points at
+  TUN-0205 (playback state restoration).
+- **What was built**: `PlaybackQueueCommands` is the session's whole command surface: play a list (at
+  an index), Play Next, add to end, remove current, remove an item, reorder, clear, seek, next,
+  previous, cycle repeat, shuffle on/off. Every command writes through `QueueRepository` first and
+  then makes the player match, so the two places one queue lives cannot disagree - the persisted queue
+  is the authority for *order*, the player for *position* and for what is audible.
+- **The documented policies, in code rather than in a comment**: Previous restarts the current track
+  at or past a named 3-second threshold (`SPEC/AUDIO_ENGINE.md`) and always restarts at the first
+  item instead of wrapping; Next at the end with repeat Off stops without clearing the queue, with
+  repeat All wraps, with repeat One repeats the current item; removing the current item advances to
+  the successor and removing the last one empties the player so the UI can hide its controls truthfully.
+- **Shuffle stays materialised**: turning it on rewrites the stored order into the seeded permutation
+  with the current item first and gives *that* order to the player, whose own shuffle is deliberately
+  left off - two shuffles would be a second order nobody can reason about, and a restore could not
+  reproduce it. Edits preserve the listening position by passing it back into `setMediaItems`.
+- **A queue holds tracks, not sources**: media ids gained a `tunenagi:track:<uuid>` form, and the
+  library-backed resolution picks the source at resolve time - the user's **locked** source is honoured
+  even when it is unplayable (reporting it is honest; quietly playing a different copy is the
+  substitution `SPEC/PROVIDERS.md` forbids), a merely preferred source that is gone falls back to
+  another available copy of the same recording, and a track with no source fails typed.
+- **Two real defects the tests caught, both fixed in the code**: the resolution's future wrapped its
+  typed `UnresolvedMediaItemException` in an `ExecutionException`, so callers would have had to unwrap
+  the mechanics of waiting to see the error (the commands now unwrap it); and Media3's `stop()`
+  leaves `playWhenReady` set, which is exactly how a UI shows a play button over a queue it cannot
+  play - stopping now lowers it in one place. Three tests failed on the first run for those reasons.
+- **Wiring, not dead code**: the install point became a small `PlaybackGraph` (resolution + queue
+  repository, Hilt-provided in `core.playback`), and the service builds the commands over *its* own
+  player in `onCreate` and drops them in `onDestroy` - a command that outlived its player could seek
+  into nothing. `queueCommands` is null when a host installs a resolution without a library, and a
+  test asserts both that and the lifecycle.
+- **Commands and exit codes (evidence paths)**:
+  - `python SCRIPTS/verify.py && python SCRIPTS/check_boundaries.py && python SCRIPTS/check_boundaries.py
+    --self-test` -> exit 0, 9/9 steps with the tests, the APK build and lint really executing
+    (unit-tests 57.3s, assemble 19.3s, lint 85.9s), 82 Kotlin files, 0 boundary problems, gate
+    self-test green (`STATE/evidence/TUN-0204/20261016T174346Z-verify-all-steps-and-boundary-gate.json`).
+    That run covered the code as committed; the checkpoint text itself was then re-checked with
+    `python SCRIPTS/verify.py --fast` -> exit 0, 5/5 (package, format, secrets, ci-definition,
+    boundaries), which is the step that would have caught a text-hygiene violation in this entry
+    (`.../20261016T180019Z-fast-verify-after-checkpoint-docs.json`). No code changed after the full
+    run, so the JDK-backed steps were not needlessly repeated.
+  - `:core:testDebugUnitTest` filtered to the playback/provider/database suites -> exit 1 on the first
+    attempt (one compilation error of mine: JUnit 4 takes the message *first*, and two assertions had
+    it last), then exit 1 again with 3 real failures (above), then exit 0
+    (`.../20261016T173400Z-queue-command-transition-tests-3.json`, `.../20261016T173916Z-*`,
+    `.../20261016T174151Z-track-level-resolution-tests-2.json`). Every failing run is kept.
+- **Test totals now**: 266 JVM tests (`:core` 241 across 19 classes, `:app` 25 across 4), 0 failures.
+- **Device / emulator observations**: none possible (no device, no hypervisor driver). The substitute
+  is stated rather than implied: the transitions are driven against a **real** `ExoPlayer` and a real
+  Room database, and they assert the queue the player holds, its current index, `playWhenReady`,
+  repeat and shuffle state, and the persisted snapshot. They do **not** prove that audio plays, that a
+  seek lands where the user hears it, or that a half-second edit is gapless - the fixture uri points
+  at no file, and no decoder is involved. Recorded in `OPERATIONS/DEFERRED_VERIFICATION.md`.
+- **Blockers or risks**: the standing deferral, plus one deliberate boundary of this slice that a
+  later task must close: the commands are *session-side*, and the UI-facing transport (Media3 custom
+  session commands, or a controller-side facade) lands with the queue UI in TUN-0703, because Media3's
+  own controller surface cannot carry the previous-threshold or materialised-shuffle policies. Until
+  then nothing in the UI can reach the commands, and the phase-02 audit should read it that way.
+- **Next exact action**: TUN-0205 - persist the queue and the current position with debounced writes
+  and restore them without starting playback by surprise.
