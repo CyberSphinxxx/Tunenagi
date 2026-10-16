@@ -68,3 +68,31 @@ sealed interface ResolveResult {
     /** The source exists but needs a user action first, such as re-granting access. */
     data class NeedsUserAction(val availability: SourceAvailability) : ResolveResult
 }
+
+/**
+ * Turns one [TrackSource] into something the player can open *now* — owned.
+ *
+ * `SPEC/ARCHITECTURE.md` fixes the shape: playback coordinates `TrackSource` -> fresh
+ * `PlayableReference` -> `MediaItem` "using provider resolvers". The interface lives in the domain
+ * layer rather than in the playback layer on purpose, so a provider adapter can implement it
+ * without knowing anything about the player (rule B11 forbids a provider from importing
+ * `core.playback`), and so `core.playback` can depend on the *interface* without depending on any
+ * particular provider.
+ *
+ * Resolution is deliberately late — as close to playback as practical — because a resolved
+ * reference is not durable: a stream URL expires and a file can be deleted. The returned
+ * [ResolveResult] is a value, not an exception, because every failure here is a state the UI has
+ * to show rather than a crash.
+ */
+interface PlaybackSourceResolver {
+
+    /** The provider whose sources this resolver answers for. */
+    val providerId: ProviderId
+
+    /**
+     * `track` is the metadata the caller already holds; `source` is the version to open. A resolver
+     * may not reach for a different source than the one it was handed: `SPEC/PROVIDERS.md` forbids
+     * silently replacing an unplayable source with another copy of the same recording.
+     */
+    suspend fun resolve(track: Track, source: TrackSource): ResolveResult
+}

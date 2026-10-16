@@ -460,3 +460,91 @@ provider task.
 
 **Owner review needed?** No: an architectural rule was made enforceable, and no product behaviour
 or acceptance criterion changed.
+
+## ADR-013 - The platform-created service is handed its resolution, because the app owns the providers (2026-10-16)
+
+**Context**: TUN-0203 makes playback resolve a real library item: the session turns a media id into a
+`TrackSource`, asks a `PlaybackSourceResolver` for a fresh reference, and hands the player an item it
+can open. Two dependency rules decide who can build that object. B7 forbids `:app` from importing
+`core.database`, so the app cannot assemble a database-backed resolution; B11 forbids a provider
+adapter from importing `core.playback`, so `core.playback` cannot construct the local resolver
+either. The only place with both is a Hilt module inside `core.playback` - and the service that
+needs the result is created by the *operating system*, so there is no constructor at which Hilt can
+hand it anything.
+
+**Options**: (a) annotate the service `@AndroidEntryPoint` and inject the resolution into it;
+(b) declare an app-side subclass of the service in the app manifest, replacing the library's
+declaration, and inject there; (c) provide the resolution from `core.playback`'s Hilt module exactly
+as the app's graph would, and have `TunenagiApp.onCreate` install it into one named holder
+(`PlaybackResolution`) that the service reads when it builds its session.
+
+**Decision**: (c).
+
+**Consequences**:
+- Hilt still owns every binding: the database comes from `core.database`'s own module, the local
+  resolver from the provider adapter's `@IntoSet` module (`LocalProviderModule`), and the resolution
+  from `core.playback`'s `PlaybackModule`. The holder carries one value and has one default.
+- (a) is rejected because Hilt's service injection makes the *generated*
+  `Hilt_TunenagiPlaybackService` the component the platform starts: the merged manifest then names a
+  class that exists only in build output, which takes TUN-0201's manifest assertions (declared
+  service, foreground-service type, media-library action) with it, and it would require a
+  Robolectric+Hilt test application this project does not have.
+- (b) is rejected as a larger change for the same goal: it moves the service declaration, the
+  session token and the manifest test into the app, rewriting verified TUN-0201 artifacts to gain
+  nothing (c) does not already provide.
+- The default is a real behaviour rather than a stub: with nothing installed, a session still plays
+  an item that carries its own uri and refuses everything else with a typed error, so a host that
+  forgets to install gets visible failures instead of a wrong track.
+- The install is read once, when a service is built, so one session cannot resolve the same media id
+  two different ways in the middle of a queue.
+- The cost is stated, not hidden: a process-wide holder is a global, and its one invariant
+  ("installed before the first service") is guaranteed by where it is called (an `Application`) and
+  checked by a test that installs a resolution and asserts the service's session uses it.
+
+**Affected tasks**: TUN-0203 (the resolution and the install point), TUN-0204 and TUN-0205 (the queue
+and state restoration need the same service-side graph), TUN-0207 (typed failures), the phase-02
+audit.
+
+**Owner review needed?** No: no product behaviour is decided beyond "a library item resolves through
+the app's own graph", and ADR-008's missing runtime is why the two injection paths were rejected.
+
+## ADR-014 - A local file's bytes decide its format, and the playable matrix is explicit (2026-10-16)
+
+**Context**: TUN-0203 must "resolve actual local MP3/FLAC and unsupported media via typed errors".
+Three sources of evidence exist for what a file is: the content type a scan recorded (MediaStore's
+`MIME_TYPE`, or a SAF provider's guess from the file name), the file extension, and the file's own
+first bytes. They disagree exactly when it matters - a tagged FLAC, a media folder full of WMA, a
+container written by a tool that mislabelled it.
+
+**Options**: (a) trust the declared content type and hand the uri to Media3; (b) read the header,
+map it to a container, and decide playability from an explicit set; (c) read the header only to
+explain a decoder failure after the fact.
+
+**Decision**: (b). `LocalAudioSniffer` recognises MP3 (an ID3 tag or a MPEG frame sync), FLAC, the
+`ftyp`-based MP4/M4A container, Ogg, WAV and AAC in ADTS, and - deliberately - AIFF, WMA/ASF and
+MIDI, which this app will not play. `LocalAudioContainer.PLAYABLE` names the six containers the app
+ships with; anything outside it is `ProviderError.UnsupportedFormat`. The declared content type is
+used for exactly one thing: a video brand in an `ftyp` box is not treated as the user's music.
+
+**Consequences**:
+- A file whose bytes say WMA fails at resolve time with a typed error instead of failing inside a
+  decoder, so `SPEC/AUDIO_ENGINE.md`'s ban on silently transcoding unsupported media holds by
+  construction rather than by review.
+- The format handed to the player - and written back to the source's `contentType` - is the sniffed
+  one, so a wrong scan label is corrected by playback instead of propagated.
+- The matrix is an app-level declaration, not a device measurement: `SPEC/AUDIO_ENGINE.md` says local
+  support follows the platform decoders, and whether a given device's decoders accept a container is
+  unverifiable here (ADR-008). The deferral is recorded in `OPERATIONS/DEFERRED_VERIFICATION.md`, and
+  a header check is never described as a decode test.
+- Sixteen bytes are read per resolve, and that bound is part of the contract (`HEADER_BYTES`) and is
+  asserted, so a later change cannot quietly turn resolution into a full file read.
+- Bytes that only *look* like a container (an `ftyp` video brand, `RIFF` without `WAVE`, a header too
+  short to hold the signature) are reported as unknown rather than guessed at.
+
+**Affected tasks**: TUN-0203 (the sniffer and the resolver), TUN-0207 (buffering/error states map
+from these typed errors), TUN-0307 (the source inspector shows the format this learned), TUN-0505
+(embedded artwork and tag reading, which this decision deliberately leaves out), the phase-02 audit.
+
+**Owner review needed?** No: the six playable containers are the formats the platform has covered
+since the project's minimum API, and the three excluded ones are excluded because none of them is
+guaranteed across that range.

@@ -453,3 +453,71 @@ below is the original entry's content.
   at resolve time).
 - **Next exact action**: TUN-0203 - resolve a playable local source for a track and its `TrackSource`,
   with typed errors for unsupported formats, missing files and missing permission.
+
+## 2026-10-16T17:20Z - Codebuff session (phase 02, TUN-0203)
+
+- **Phase/tasks**: TUN-0203 verified (phase 02, 3/8). `python SCRIPTS/taskctl.py next` now points at
+  TUN-0204 (queue commands and shuffle repeat).
+- **What was built**: playback can now turn a library item into something the player can open.
+  `PlaybackSourceResolver` (the interface `SPEC/ARCHITECTURE.md` already described) lives in the
+  domain layer; `LocalSourceResolver` implements it for `builtin.local`; and
+  `LibraryMediaItemResolution` is the object the session resolves through: media id -> `TrackSource`
+  in Room -> resolver -> a `MediaItem` with the resolved uri, the sniffed format and the library's
+  metadata, or a typed `UnresolvedMediaItemException` naming the item and carrying the
+  `ProviderError`/`SourceAvailability` that caused it.
+- **The bytes decide the format (ADR-014)**: `LocalAudioSniffer` reads a bounded 16-byte header and
+  recognises MP3 (ID3 or a MPEG frame sync), FLAC, MP4/M4A, Ogg, WAV, ADTS AAC - and AIFF, WMA/ASF
+  and MIDI, which this app refuses with `ProviderError.UnsupportedFormat` instead of handing a
+  decoder something it cannot open. A declared `contentType` is only a hint: it is used for the
+  `ftyp` video-brand case and never to override the bytes, so a scan's wrong label is corrected by
+  playback rather than propagated (the corrected format is written back to the source).
+- **Gone and denied are different states**: `SecurityException` -> `NeedsUserAction(PermissionRequired)`,
+  `FileNotFoundException` -> `NeedsUserAction(StorageGone)`, anything else -> a typed failure with a
+  stable category. A resolve writes back what it learned - availability, and the format - so the
+  library reflects reality after one playback attempt; nothing is ever deleted, and a row already in
+  the failing state is not rewritten.
+- **Wiring (ADR-013)**: the service is created by the OS, so the app installs the library-backed
+  resolution into one named holder (`PlaybackResolution`) from `TunenagiApp.onCreate`; the bindings
+  themselves are Hilt modules - the database in `core.database`, the local resolver in its own
+  provider module (`@IntoSet`), the resolution in `core.playback`. The default before an install is a
+  real behaviour, not a stub: an item that carries its own uri plays, anything else fails typed.
+  Two injection paths were rejected with reasons in the ADR (Hilt's rewritten `Hilt_...` service
+  would take TUN-0201's manifest assertions with it; an app-side service subclass is a bigger change
+  for the same result).
+- **Instrumentation**: every resolve records a bounded, path-free `ResolveAttempt` (provider, source
+  id, outcome, elapsed ms) into `RecentResolveDiagnostics`, which is what `SPEC/PROVIDERS.md` means by
+  local opt-in diagnostic events with no telemetry upload. A test asserts a record contains no uri,
+  no path and no file name, so the log cannot leak the user's library.
+- **Commands and exit codes (evidence paths)**:
+  - `python SCRIPTS/verify.py && python SCRIPTS/check_boundaries.py && python SCRIPTS/check_boundaries.py
+    --self-test` -> exit 0, 9/9 steps, 80 Kotlin files, 0 boundary problems, gate self-test green
+    (`STATE/evidence/TUN-0203/20261016T171629Z-verify-all-steps-and-boundary-gate.json`). Run after
+    `git add`, because the gates read git's *stored* content: the first green run of this task was
+    against unstaged files and would not have covered them (the earlier boundary runs reported 69
+    files, i.e. the pre-task tree).
+  - `python SCRIPTS/verify.py` -> exit 0, 9/9 with the tests, APK build and lint really executing
+    (unit-tests 67.3s, assemble 46.2s, lint 129.1s) against exactly this source content
+    (`.../20261016T170954Z-verify-all-steps.json`); the later run above is the same content with
+    Gradle up-to-date, and both are kept.
+  - `:core:testDebugUnitTest --tests "com.tunenagi.core.provider.local.*" --tests
+    "com.tunenagi.core.playback.*"` -> exit 1 on the first attempt, 91 tests, 2 failed
+    (`.../20261016T170412Z-local-resolver-and-playback-tests.json`), then exit 0 after the fixes
+    (`.../20261016T170806Z-playback-resolution-tests-after-fixture-fix.json`). Both failures were
+    real and fixed rather than explained away: two seeded sources collided on the database's own
+    identity index `(providerId, externalId, sourceVariant)` because my fixture reused `externalId`,
+    and I had asserted `isBrowsable == false` where Media3 leaves the flag *unset* for a playable
+    item - the assertions now say what the code actually promises (`isPlayable == true`, browsable
+    unset).
+- **Test totals now**: 241 JVM tests (`:core` 216 across 18 classes, `:app` 25 across 4), 0 failures.
+- **Device / emulator observations**: none possible (no device, no hypervisor driver). The substitute
+  is stated rather than implied: the sniffer is asserted byte by byte over real headers, the resolver
+  over real header bytes and a real Room database, and the session over the real `MediaLibrarySession`
+  and the real `ExoPlayer`. Nothing here proves that a *device decoder* opens a container this app
+  classified, that a real MediaStore/SAF grant returns those bytes, or that tags/cover art read -
+  all three are now in `OPERATIONS/DEFERRED_VERIFICATION.md` (ADR-008), and the task note says so.
+- **Blockers or risks**: the standing deferral, plus the honest limits of this slice - the resolved
+  item carries an artwork *uri* only (loading and downsampling is TUN-0505), tag reading is still
+  absent, and nothing yet asks the session for a queue, so the resolve path is exercised by tests and
+  by the app's graph rather than by a user tapping play (that is TUN-0204).
+- **Next exact action**: TUN-0204 - next/previous/seeking, add/remove/reorder, shuffle and repeat with
+  bounded behaviour and state-transition tests.

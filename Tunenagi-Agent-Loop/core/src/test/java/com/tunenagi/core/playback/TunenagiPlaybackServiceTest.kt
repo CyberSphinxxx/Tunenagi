@@ -7,7 +7,9 @@ import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
 import androidx.media3.session.SessionError
+import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import java.util.UUID
 import java.util.concurrent.ExecutionException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -164,6 +166,62 @@ class TunenagiPlaybackServiceTest {
         } finally {
             service.onDestroy()
         }
+    }
+
+    /**
+     * The wiring itself, which no other test covers: the OS creates this service, so the resolution
+     * it resolves through is installed before it exists (ADR-013). If the service stopped reading
+     * that install point, its session would quietly fall back to "only items that already carry a
+     * uri" and every library item would fail — the exact defect this test fails on.
+     */
+    @Test
+    fun theSessionResolvesThroughTheResolutionTheHostInstalled() {
+        val installed = MediaItemResolution { requested ->
+            Futures.immediateFuture(
+                requested.map { it.buildUpon().setUri("content://installed/1").build() }
+            )
+        }
+        PlaybackResolution.install(installed)
+        try {
+            val service = startedService()
+            try {
+                val requested = MediaItem.Builder()
+                    .setMediaId("tunenagi:source:${UUID.randomUUID()}")
+                    .build()
+
+                val resolved = service.sessionCallback.onAddMediaItems(
+                    service.ownedSession!!,
+                    controllerInfo(trusted = true),
+                    listOf(requested)
+                ).get()
+
+                assertEquals(
+                    "content://installed/1",
+                    resolved.single().localConfiguration!!.uri.toString()
+                )
+            } finally {
+                service.onDestroy()
+            }
+        } finally {
+            PlaybackResolution.reset()
+        }
+    }
+
+    /**
+     * The other half of that contract: with nothing installed, a session refuses an item it cannot
+     * resolve on its own rather than inventing a uri for it.
+     */
+    @Test
+    fun aHostThatInstallsNothingGetsTheRefusingDefault() {
+        PlaybackResolution.reset()
+        val mediaId = "tunenagi:source:${UUID.randomUUID()}"
+        val requested = MediaItem.Builder().setMediaId(mediaId).build()
+
+        val failure = assertRequestFails(PlaybackResolution.current().resolve(listOf(requested)))
+
+        assertTrue(failure is UnresolvedMediaItemException)
+        assertEquals(mediaId, (failure as UnresolvedMediaItemException).mediaId)
+        assertTrue(failure.error == null && failure.availability == null)
     }
 
     @Test

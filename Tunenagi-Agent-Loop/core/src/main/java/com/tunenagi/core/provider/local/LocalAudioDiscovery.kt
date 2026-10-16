@@ -217,9 +217,10 @@ class MediaStoreAudioDiscovery(
  * One folder the user picked through the system picker (SAF), read through its persistable grant.
  *
  * SAF has no `IS_MUSIC` and no album ids, so the filter is the document mime type and the artwork
- * reference is left null rather than guessed: `SPEC/PROVIDERS.md` puts embedded art and download
- * bounds in the resolver's job (TUN-0203), and inventing a uri here would make a later artwork task
- * read the wrong thing.
+ * reference is left null rather than guessed: embedded art is read, downsampled and cached by the
+ * artwork task (TUN-0505), and inventing a uri here would make that task read the wrong thing. The
+ * resolver (TUN-0203) answers a different question — whether the file is readable and what
+ * container it actually is — and does not invent tags either.
  */
 class SafTreeAudioDiscovery(
     private val rows: AudioRowSource,
@@ -286,7 +287,9 @@ class SafTreeAudioDiscovery(
                 // A file name is not an artist: any tag reading belongs in the resolver, where it can
                 // be wrong honestly rather than invented here.
                 artist = null,
-                // DocumentsContract exposes no duration column; the resolver reads it from the file.
+                // DocumentsContract exposes no duration column; the player reports the real duration
+                // once the file is open, and guessing from a file size would be a wrong number in
+                // the UI. Tag reading is TUN-0505's job, not a placeholder to fill here.
                 durationMs = null,
                 mimeType = mime,
                 artworkUri = null
