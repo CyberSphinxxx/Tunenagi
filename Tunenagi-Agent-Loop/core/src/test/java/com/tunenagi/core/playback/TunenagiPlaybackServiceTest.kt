@@ -9,8 +9,18 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.SessionError
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.tunenagi.core.model.PlaybackSnapshot
+import com.tunenagi.core.model.QueueItem
+import com.tunenagi.core.model.QueueItemId
+import com.tunenagi.core.model.RepeatMode
+import com.tunenagi.core.model.TrackId
+import com.tunenagi.core.model.TrackSourceId
+import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ExecutionException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -35,6 +45,66 @@ class TunenagiPlaybackServiceTest {
 
     private fun startedService(): TunenagiPlaybackService =
         Robolectric.buildService(TunenagiPlaybackService::class.java).create().get()
+
+    /**
+     * A real Room database, created only when a test needs one.
+     *
+     * The queue commands must be built over *some* repository, and the assertions that matter here
+     * (which player they use, and that they are dropped) do not depend on persistence, so this is the
+     * one place a simpler in-memory queue is used instead of dragging Room into every service test.
+     */
+    private class InMemoryQueueRepository : QueueRepository {
+        private var snapshot = PlaybackSnapshot()
+
+        override fun observe(): Flow<PlaybackSnapshot> = flowOf(snapshot)
+
+        override suspend fun snapshot(): PlaybackSnapshot = snapshot
+
+        override suspend fun replaceQueue(
+            trackIds: List<TrackId>,
+            startIndex: Int,
+            at: Instant
+        ): PlaybackSnapshot {
+            val items = trackIds.mapIndexed { index, trackId ->
+                QueueItem(
+                    id = QueueItemId.random(),
+                    trackId = trackId,
+                    position = index,
+                    addedAt = at
+                )
+            }
+            snapshot = PlaybackSnapshot(queue = items, currentItemId = items[startIndex].id)
+            return snapshot
+        }
+
+        override suspend fun append(trackId: TrackId, at: Instant, sourceOverrideId: TrackSourceId?): QueueItem =
+            throw UnsupportedOperationException("not needed by this test")
+
+        override suspend fun playNext(trackId: TrackId, at: Instant, sourceOverrideId: TrackSourceId?): QueueItem =
+            throw UnsupportedOperationException("not needed by this test")
+
+        override suspend fun remove(itemId: QueueItemId) = Unit
+
+        override suspend fun move(itemId: QueueItemId, toIndex: Int) = Unit
+
+        override suspend fun clear() {
+            snapshot = PlaybackSnapshot()
+        }
+
+        override suspend fun setCurrent(itemId: QueueItemId) = Unit
+
+        override suspend fun setRepeatMode(mode: RepeatMode) {
+            snapshot = snapshot.copy(repeatMode = mode)
+        }
+
+        override suspend fun setShuffle(enabled: Boolean, seed: Int, at: Instant) = Unit
+
+        override suspend fun saveProgress(progressMs: Long, at: Instant) {
+            snapshot = snapshot.copy(progressMs = progressMs)
+        }
+
+        override suspend fun shuffledOrder(seed: Int): List<QueueItemId> = snapshot.queue.map { it.id }
+    }
 
     private fun controllerInfo(trusted: Boolean): MediaSession.ControllerInfo =
         MediaSession.ControllerInfo.createTestOnlyControllerInfo(
@@ -175,12 +245,14 @@ class TunenagiPlaybackServiceTest {
      * uri" and every library item would fail — the exact defect this test fails on.
      */
     @Test
-    fun theSessionResolvesThroughTheResolutionTheHostInstalled() {
-        val installed = MediaItemResolution { requested ->
-            Futures.immediateFuture(
-                requested.map { it.buildUpon().setUri("content://installed/1").build() }
-            )
-        }
+    fun theSessionResolvesThroughTheGraphTheHostInstalled() {
+        val installed = PlaybackGraph(
+            resolution = MediaItemResolution { requested ->
+                Futures.immediateFuture(
+                    requested.map { it.buildUpon().setUri("content://installed/1").build() }
+                )
+            }
+        )
         PlaybackResolution.install(installed)
         try {
             val service = startedService()
@@ -199,8 +271,51 @@ class TunenagiPlaybackServiceTest {
                     "content://installed/1",
                     resolved.single().localConfiguration!!.uri.toString()
                 )
+                // A graph with a resolution but no library leaves the session without a queue to
+                // persist, which is a state the session reports instead of assuming away.
+                assertNull(service.queueCommands)
             } finally {
                 service.onDestroy()
+            }
+        } finally {
+            PlaybackResolution.reset()
+        }
+    }
+
+    /**
+     * A host that installs a library gets the queue commands built over *its* player, and they do not
+     * outlive it: a command holding a released player would be a seek into nothing.
+     */
+    @Test
+    fun theServiceBuildsQueueCommandsOverItsOwnPlayerAndDropsThemWithIt() {
+        val earlierService = startedService()
+        val earlierPlayer = earlierService.ownedPlayer!!
+        earlierService.onDestroy()
+        val resolution = MediaItemResolution { requested ->
+            Futures.immediateFuture(
+                requested.map { it.buildUpon().setUri("file:///music/fixture.mp3").build() }
+            )
+        }
+        PlaybackResolution.install(PlaybackGraph(resolution = resolution, queue = InMemoryQueueRepository()))
+        try {
+            val service = startedService()
+            try {
+                val commands = service.queueCommands
+                assertNotNull("a host with a library must get queue commands", commands)
+
+                val snapshot = runBlocking { commands!!.play(listOf(TrackId.random())) }
+
+                assertEquals(1, snapshot.queue.size)
+                assertEquals(1, service.ownedPlayer!!.mediaItemCount)
+                assertFalse(
+                    "a recreated service must not command the previous player",
+                    earlierPlayer === service.ownedPlayer
+                )
+            } finally {
+                val engine = service.ownedEngine!!
+                service.onDestroy()
+                assertNull("commands must not survive their player", service.queueCommands)
+                assertTrue(engine.isReleased)
             }
         } finally {
             PlaybackResolution.reset()
@@ -217,7 +332,9 @@ class TunenagiPlaybackServiceTest {
         val mediaId = "tunenagi:source:${UUID.randomUUID()}"
         val requested = MediaItem.Builder().setMediaId(mediaId).build()
 
-        val failure = assertRequestFails(PlaybackResolution.current().resolve(listOf(requested)))
+        val failure = assertRequestFails(
+            PlaybackResolution.current().resolution.resolve(listOf(requested))
+        )
 
         assertTrue(failure is UnresolvedMediaItemException)
         assertEquals(mediaId, (failure as UnresolvedMediaItemException).mediaId)

@@ -39,4 +39,21 @@ object PlaybackModule {
         resolvers = resolvers.toList(),
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     )
+
+    /**
+     * The persisted queue the session's commands write through.
+     *
+     * One instance for the process: it is stateless over the database, but a second one would be a
+     * second place a caller could hold and write, and the queue's whole value is that there is one
+     * order everybody agrees on.
+     */
+    @Provides
+    @Singleton
+    fun queueRepository(database: TunenagiDatabase): QueueRepository = RoomQueueRepository(database)
+
+    /** The pair the service is handed at start-up; see [PlaybackResolution]. */
+    @Provides
+    @Singleton
+    fun playbackGraph(resolution: MediaItemResolution, queue: QueueRepository): PlaybackGraph =
+        PlaybackGraph(resolution = resolution, queue = queue)
 }
