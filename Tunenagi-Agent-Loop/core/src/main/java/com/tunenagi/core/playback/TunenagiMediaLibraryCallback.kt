@@ -11,6 +11,8 @@ import androidx.media3.session.SessionError
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.tunenagi.core.model.ProviderError
+import com.tunenagi.core.model.SourceAvailability
 
 /**
  * How the session turns the media items a controller asks for into items the player can play —
@@ -21,31 +23,46 @@ import com.google.common.util.concurrent.ListenableFuture
  * itself, and *that* is where an unavailable or unplayable source must become a typed failure
  * rather than a crash or a silently empty queue.
  *
- * Phase 02 has no library behind it yet, so [LocalUriOnly] is the honest implementation: an item
- * that already carries a playable local URI is passed through (this is what makes playback work for
- * a file the app itself selected), and anything else fails with [UnresolvedMediaItemException].
- * The MediaStore/SAF-backed resolver replaces this object in TUN-0203, and the callback that uses
- * it does not change.
+ * [LocalUriOnly] is the honest floor and the default: an item that already carries a playable local
+ * URI is passed through (this is what makes playback work for a file the app itself selected), and
+ * anything else fails with [UnresolvedMediaItemException]. The library-backed implementation
+ * (`LibraryMediaItemResolution`, TUN-0203) replaces it wherever a resolver and a database are
+ * installed, and the callback below does not change either way.
+ *
+ * The seam is *list*-shaped and asynchronous because that is what the caller actually is: Media3
+ * asks for a set of items, and answering it requires a database read and a provider resolve. A
+ * synchronous per-item signature would have forced the lookup onto the session's thread — the same
+ * mistake TUN-0202 refused to make with a MediaStore query.
  */
 fun interface MediaItemResolution {
 
-    /** Returns a playable item, or throws [UnresolvedMediaItemException]. */
-    fun resolve(requested: MediaItem): MediaItem
+    /**
+     * Returns the items the player should hold, or fails the whole request with
+     * [UnresolvedMediaItemException].
+     */
+    fun resolve(requested: List<MediaItem>): ListenableFuture<List<MediaItem>>
 
     companion object {
         /**
          * Accepts items that carry a local configuration URI and rejects the rest.
          *
          * It never invents a URI: guessing a path from a media id would turn a "not found" into a
-         * playback of something else, and a wrong song is worse than an error message.
+         * playback of something else, and a wrong song is worse than an error message. It also names
+         * the first item that failed, so the caller can report *which* one it was rather than only
+         * that something in the batch was unresolvable.
          */
         val LocalUriOnly = MediaItemResolution { requested ->
-            if (requested.localConfiguration?.uri != null) {
-                requested
+            val unresolved = requested.firstOrNull { it.localConfiguration?.uri == null }
+            if (unresolved == null) {
+                Futures.immediateFuture(requested)
             } else {
-                throw UnresolvedMediaItemException(requested.mediaId)
+                Futures.immediateFailedFuture<List<MediaItem>>(
+                    UnresolvedMediaItemException(unresolved.mediaId, NO_LOCAL_URI)
+                )
             }
         }
+
+        private const val NO_LOCAL_URI = "the item carries no playable local uri"
     }
 }
 
@@ -54,15 +71,33 @@ fun interface MediaItemResolution {
  *
  * Typed rather than a bare `IllegalStateException` so the controller side receives a failure it can
  * report verbatim, and so TUN-0207 can map it to a user-visible state without parsing a message.
+ *
+ * The reason travels as *values*, not as prose: [error] is the provider taxonomy entry the resolver
+ * produced and [availability] is the source state that needs a user action. A caller that only has
+ * the message would have to string-match it to decide whether to offer a retry or a re-grant, and a
+ * message is the one part of an exception this project is happy to change.
  */
 class UnresolvedMediaItemException(
     val mediaId: String,
-    val source: String? = null
+    /** A short, non-sensitive label for why this item could not be resolved. */
+    val source: String? = null,
+    /** The typed provider failure, when the resolver produced one. */
+    val error: ProviderError? = null,
+    /** The source state the user has to change, when the resolve needs an action. */
+    val availability: SourceAvailability? = null
 ) : RuntimeException(
     buildString {
         append("Tunenagi cannot play media item '")
         append(mediaId)
-        append("': no playable local source is attached")
+        append("': ")
+        when {
+            error != null -> append(error.userMessage)
+            availability == SourceAvailability.PermissionRequired ->
+                append("access to it has to be granted again")
+            availability == SourceAvailability.StorageGone ->
+                append("the file is no longer on this device")
+            else -> append("no playable local source is attached")
+        }
         if (source != null) append(" (source: ").append(source).append(')')
     }
 )
@@ -128,18 +163,15 @@ class TunenagiMediaLibraryCallback(
      *
      * Failing the request is Media3's own contract for this callback and it is also the safer
      * behaviour: a partly-resolved queue would play some of what the user asked for and leave a
-     * broken entry that only surfaces later, mid-playback. The resolver reports which item failed.
+     * broken entry that only surfaces later, mid-playback. The resolution reports which item failed
+     * and why, and this method deliberately adds nothing to that: an adapter that re-wrote the
+     * failure would be the second place the error taxonomy lives.
      */
     override fun onAddMediaItems(
         session: MediaSession,
         controller: MediaSession.ControllerInfo,
         mediaItems: List<MediaItem>
-    ): ListenableFuture<List<MediaItem>> =
-        try {
-            Futures.immediateFuture(mediaItems.map(resolution::resolve))
-        } catch (unresolved: UnresolvedMediaItemException) {
-            Futures.immediateFailedFuture(unresolved)
-        }
+    ): ListenableFuture<List<MediaItem>> = resolution.resolve(mediaItems)
 
     private fun rootItem(): MediaItem =
         MediaItem.Builder()

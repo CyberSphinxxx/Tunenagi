@@ -18,7 +18,9 @@ import androidx.media3.session.MediaSession
  * (see [TunenagiMediaLibraryCallback]) and the app's `MediaController`.
  *
  * `onCreate` builds exactly one engine and one session over it; `onDestroy` releases both, so a
- * service that is stopped and started again cannot accumulate players. Both halves are asserted by
+ * service that is stopped and started again cannot accumulate players. The session resolves media
+ * items through the resolution the app installed (see [PlaybackResolution]). Both halves are
+ * asserted by
  * `TunenagiPlaybackServiceTest` on the JVM, using the real `ExoPlayer` and the real session — the
  * Android runtime is not available to this project (ADR-008), and a fake player would not prove the
  * invariant that matters here.
@@ -34,8 +36,12 @@ open class TunenagiPlaybackService : MediaLibraryService() {
      * Held as a named field rather than constructed inline so a test can drive the same instance
      * the session uses; Media3 does not expose a session's callback, and asserting against a
      * second, separate instance would prove nothing about the wiring.
+     *
+     * The resolution comes from [PlaybackResolution], which the Application installs: this service
+     * is created by the OS, so it has no constructor to be handed one (ADR-013). Reading it here
+     * means the session and its callback cannot disagree about how a media id is resolved.
      */
-    internal val sessionCallback = TunenagiMediaLibraryCallback()
+    internal val sessionCallback = TunenagiMediaLibraryCallback(PlaybackResolution.current())
 
     /** The engine this service owns, or `null` before [onCreate] / after [onDestroy]. */
     internal val ownedEngine: TunenagiPlaybackEngine? get() = engine

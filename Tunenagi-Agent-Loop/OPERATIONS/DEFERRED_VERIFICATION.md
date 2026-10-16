@@ -20,6 +20,7 @@ A substitute is used for the parts that can honestly be substituted, and nothing
 |---|---|---|---|
 | Compose UI behaviour | `src/sharedTest` Compose tests executed on the JVM by Robolectric (`:app:testDebugUnitTest`) | real composition, real navigation graph, real semantics tree, real assertions | device insets/cutouts, OEM theming, GPU rendering, input latency, TalkBack |
 | Audio playback | `Media3` `ExoPlayer` driven through a `TestPlayer`/fake renderer in JVM tests | state machine, queue transitions, error mapping, state restoration | real codecs, real audio focus, real background service survival, lockscreen |
+| Local source resolution (TUN-0203) | real header bytes supplied to the real sniffer and resolver, plus a real Room database with the real unique indices | the container decision from bytes, the typed errors for unsupported/gone/denied, the format and availability written back, the media-id convention | opening a file through a real `ContentResolver`/MediaStore/SAF grant, and a device decoder actually accepting the container the header announced |
 | Provider integration | MockWebServer fixtures of the real payloads | request shape, parsing, error/rate-limit mapping, retry policy | live network, real catalog contents, upstream policy/entitlement changes |
 | Storage | Room in-memory + migration tests on the JVM | schema, DAO queries, migration correctness | real on-device storage behaviour, process death, large real libraries |
 | Live third-party smoke | none | — | an actual Audius/LRCLIB/MusicBrainz request never happened; no live artifact exists |
@@ -44,6 +45,11 @@ A substitute is used for the parts that can honestly be substituted, and nothing
   GitHub runners (the workflow definition is checked locally; it has never run).
 - **Performance**: Macrobenchmark startup/jank/memory numbers from a device; no threshold in
   this project may be claimed from a JVM measurement.
+- **Local resolve proof**: no file on this host has ever been opened through a real
+  `ContentResolver`, no device decoder has been asked to play a container this app classified, and
+  embedded tags and cover art have never been read. TUN-0203 supplies the *bytes* and asserts the
+  decision made from them; that a real file with those bytes then plays is outstanding, and so is
+  TUN-0505's artwork work. The task note says so instead of implying decode proof.
 
 ## Rule for later sessions (do not drift)
 
