@@ -50,6 +50,15 @@ A substitute is used for the parts that can honestly be substituted, and nothing
   embedded tags and cover art have never been read. TUN-0203 supplies the *bytes* and asserts the
   decision made from them; that a real file with those bytes then plays is outstanding, and so is
   TUN-0505's artwork work. The task note says so instead of implying decode proof.
+- **The app's install step (TUN-0203)**: that `TunenagiApp.onCreate` installs the library-backed
+  resolution into `PlaybackResolution` is checked by the compiler (Hilt fails the build if the graph
+  cannot supply `MediaItemResolution`, or if no `PlaybackSourceResolver` is contributed) and by a
+  test that shows the service resolves through whatever is installed. What is *not* covered is a
+  runtime launch of the installed application, because that needs a device or a Hilt-aware
+  Robolectric application this project has no test infrastructure for yet. The failure mode is
+  deliberately visible rather than silent - a session with nothing installed refuses an item it
+  cannot resolve on its own instead of playing something else - but the residual risk is real and is
+  noted here rather than assumed away.
 
 ## Rule for later sessions (do not drift)
 
