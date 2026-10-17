@@ -168,7 +168,7 @@ open class TunenagiPlaybackService : MediaLibraryService() {
      */
     override fun onTaskRemoved(rootIntent: Intent?) {
         progressRecorder?.let { recorder ->
-            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { recorder.flush() }
+            CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).launch { recorder.flush() }
         }
         super.onTaskRemoved(rootIntent)
     }

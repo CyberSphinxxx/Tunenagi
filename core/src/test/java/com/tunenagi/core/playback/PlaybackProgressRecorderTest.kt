@@ -207,6 +207,7 @@ class PlaybackProgressRecorderTest {
         commands.play(queuedTracks(listOf("One", "Two", "Three")))
         val firstItem = room.snapshot().queue.first()
         val recorder = recorder()
+        recorder.start()
         frozenNowMs = 0L
 
         player.seekToNextMediaItem()
