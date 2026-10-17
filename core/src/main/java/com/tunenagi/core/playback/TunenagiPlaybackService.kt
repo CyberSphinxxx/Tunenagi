@@ -1,8 +1,14 @@
 package com.tunenagi.core.playback
 
+import android.content.Intent
 import androidx.media3.common.Player
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * The only place in Tunenagi that owns a player — owned.
@@ -31,6 +37,15 @@ open class TunenagiPlaybackService : MediaLibraryService() {
     private var library: MediaLibraryService.MediaLibrarySession? = null
 
     /**
+     * The service's own scope, for the work that has to outlive a callback but not the service.
+     *
+     * Not an application-scoped one: a checkpoint written by a service that no longer owns a player
+     * would attach a position to a queue nobody is playing, so this scope is cancelled with the
+     * engine it belongs to.
+     */
+    private val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /**
      * The callback the session was built with.
      *
      * Held as a named field rather than constructed inline so a test can drive the same instance
@@ -54,6 +69,28 @@ open class TunenagiPlaybackService : MediaLibraryService() {
     internal var queueCommands: PlaybackQueueCommands? = null
         private set
 
+    /**
+     * The debounced position checkpoint writer, or `null` when the host installed no library.
+     *
+     * Started with the player and stopped with it, so "where the user was" is recorded exactly as
+     * long as there is a player to be at a position in (TUN-0205).
+     */
+    internal var progressRecorder: PlaybackProgressRecorder? = null
+        private set
+
+    /**
+     * Why the start-up restore did not happen, when it did not.
+     *
+     * A restore can fail for a reason a user can act on - a file deleted since the last session, a
+     * media permission revoked - and that is the typed [UnresolvedMediaItemException] the resolution
+     * raises. The failure cannot be thrown from the scope it runs on (a service that crashed while
+     * starting up would be the worst possible answer), and silently swallowing it would hide a real
+     * problem, so it is *held* here for the status surface TUN-0207 builds. Nothing in this class
+     * decides how to show it.
+     */
+    internal var restoreFailure: UnresolvedMediaItemException? = null
+        private set
+
     /** The engine this service owns, or `null` before [onCreate] / after [onDestroy]. */
     internal val ownedEngine: TunenagiPlaybackEngine? get() = engine
 
@@ -75,6 +112,24 @@ open class TunenagiPlaybackService : MediaLibraryService() {
                 resolution = graph.resolution
             )
         }
+        progressRecorder = graph.queue?.let { queue ->
+            PlaybackProgressRecorder(
+                player = playbackEngine.player,
+                queue = queue,
+                scope = sessionScope
+            ).also { it.start() }
+        }
+        // The queue the user left, at the position they left it, and deliberately not playing: the
+        // operating system creating this service is not a request for sound (see
+        // `PlaybackQueueCommands.restore`).
+        sessionScope.launch {
+            val commands = queueCommands ?: return@launch
+            try {
+                commands.restore()
+            } catch (failure: UnresolvedMediaItemException) {
+                restoreFailure = failure
+            }
+        }
         library = MediaLibraryService.MediaLibrarySession.Builder(
             this,
             playbackEngine.player,
@@ -95,12 +150,41 @@ open class TunenagiPlaybackService : MediaLibraryService() {
         controllerInfo: MediaSession.ControllerInfo
     ): MediaLibraryService.MediaLibrarySession? = library
 
+    /**
+     * The last moment the user's place can be written before the task is gone.
+     *
+     * Swiping the task away is one of the paths in `SPEC/EDGE_CASES.md` ("task swiped away"), and the
+     * periodic checkpoint may be up to one interval behind it. Two details make this work rather than
+     * merely look right:
+     *
+     * - **The write does not run on [sessionScope].** Media3 stops this service from
+     *   `super.onTaskRemoved` when nothing is playing, and [onDestroy] cancels that scope - a flush
+     *   launched on it could be cancelled before Room had run the UPDATE. The last checkpoint is
+     *   therefore dispatched on a scope of its own, which is one write and then unreachable.
+     * - **It cannot be awaited.** `onTaskRemoved` runs on the main thread and a database write is
+     *   asynchronous, so this is best-effort by construction: the honest guarantee remains "at most
+     *   one interval of position is lost", and this narrows it for the swipe-away case instead of
+     *   pretending to close it.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        progressRecorder?.let { recorder ->
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { recorder.flush() }
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
+        // Detach before the engine goes: a listener left on a released player would be called for
+        // events that no longer describe anything, and its ticker would write positions for a queue
+        // this service no longer owns.
+        progressRecorder?.stop()
+        progressRecorder = null
         library?.release()
         engine?.release()
         library = null
         engine = null
         queueCommands = null
+        sessionScope.cancel()
         super.onDestroy()
     }
 

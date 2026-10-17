@@ -39,8 +39,8 @@ import kotlinx.coroutines.withContext
  * Resolution failures are not swallowed: the items handed to the player are the *resolved* items
  * (`SPEC/ARCHITECTURE.md`: a fresh reference, produced late), and an unresolvable one surfaces as the
  * typed [UnresolvedMediaItemException] from TUN-0203 rather than as silence. When that happens the
- * stored queue is ahead of the player; the next command re-applies it, and TUN-0205's restore does
- * the same after a restart.
+ * stored queue is ahead of the player; the next command re-applies it, and [restore] does the same
+ * after a restart - quietly, which is `SPEC/DATA_MODEL.md`'s rule rather than a preference.
  */
 class PlaybackQueueCommands(
     private val player: Player,
@@ -53,6 +53,43 @@ class PlaybackQueueCommands(
     private val positionMs: () -> Long = { player.currentPosition },
     private val clock: () -> Instant = Instant::now
 ) {
+
+    /**
+     * Puts the queue the user left behind back on a fresh player, without starting it.
+     *
+     * `SPEC/DATA_MODEL.md` is explicit that queue resumption after process death "should not autoplay
+     * unexpectedly unless Android media-resumption contract is met", and the operating system
+     * creating a service is not that contract: it happens when the app is opened, when a controller
+     * connects and when the system rebinds for its own reasons. So the default here is [play] `false`,
+     * and nothing about restoring produces sound - the media items and their metadata are on the
+     * player (so the queue a user sees is the one they left, and pressing play works immediately),
+     * but the player is not even prepared, which also means no decoder, no audio focus request and no
+     * buffer for a queue nobody asked to hear.
+     *
+     * The caller that *does* hold the platform's resumption contract passes `play = true`; that is the
+     * only path that prepares and plays. It is not wired here yet: the platform's resumption entry
+     * point belongs with the media controls in TUN-0206, and this method is the seam it will use.
+     *
+     * Returns `null` when the store holds no queue, which is not a failure - a first launch has
+     * nothing to restore, and the UI shows its empty state rather than an error. A failure to resolve
+     * is the typed [UnresolvedMediaItemException] from TUN-0203 and leaves the player untouched (the
+     * resolve happens before anything is handed to it), so a queue that cannot be played produces an
+     * honest empty player instead of a broken first item.
+     *
+     * A stored current item that is no longer in the queue - removed while the app was not running,
+     * or a queue edited by hand - resumes at the *first* item with no position, because the stored
+     * progress belonged to an item that is gone and applying it to a different track is the one
+     * outcome a user would notice. A stored position past the item's end is left to Media3, which
+     * clamps it when the item is prepared.
+     */
+    suspend fun restore(play: Boolean = false): PlaybackSnapshot? {
+        val snapshot = queue.snapshot()
+        if (snapshot.queue.isEmpty()) return null
+        val index = snapshot.queue.indexOfFirst { it.id == snapshot.currentItemId }
+        val resumeMs = if (index < 0) 0L else snapshot.progressMs.coerceAtLeast(0)
+        apply(snapshot, resumeMs = resumeMs, play = play, prepare = play)
+        return snapshot
+    }
 
     /** Starts a new queue and begins playing it. */
     suspend fun play(trackIds: List<TrackId>, startIndex: Int = 0): PlaybackSnapshot {
@@ -194,7 +231,17 @@ class PlaybackQueueCommands(
         return snapshot
     }
 
-    private suspend fun apply(snapshot: PlaybackSnapshot, resumeMs: Long, play: Boolean) {
+    private suspend fun apply(
+        snapshot: PlaybackSnapshot,
+        resumeMs: Long,
+        play: Boolean,
+        /**
+         * Whether the items are turned into audio now. False only for a restore nobody asked to
+         * hear: `setMediaItems` alone already gives a controller the queue and its metadata, while a
+         * `prepare` would open a decoder and take audio focus for it.
+         */
+        prepare: Boolean = true
+    ) {
         if (snapshot.queue.isEmpty()) {
             stopPlayback()
             player.clearMediaItems()
@@ -204,9 +251,9 @@ class PlaybackQueueCommands(
         val items = resolved(snapshot.queue.map { item(it) })
         player.setMediaItems(items, index, resumeMs)
         // `prepare` is what turns the ids into audio; `play` is only ever true when the caller asked
-        // for sound (a new queue) or something was already playing (an edit mid-listen), so a command
-        // never starts playback the user had paused.
-        player.prepare()
+        // for sound (a new queue, or the platform's resumption contract) or something was already
+        // playing (an edit mid-listen), so a command never starts playback the user had paused.
+        if (prepare) player.prepare()
         if (play) player.play()
     }
 
