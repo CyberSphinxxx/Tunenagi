@@ -36,6 +36,23 @@ internal object Fixtures {
             .allowMainThreadQueries()
             .build()
 
+    /**
+     * The same database, with its queries running on the calling thread.
+     *
+     * For the tests whose *subject* is something that launches work in the background - the progress
+     * recorder does its checkpoints off a player callback - "the write happened" is asserted straight
+     * after the call, so the write has to finish by then. A direct executor makes Room's suspension
+     * points run inline (Robolectric runs the test on the main thread, where `Dispatchers.Main`
+     * dispatches immediately), which turns a timing question into an ordering one. Production uses
+     * Room's real executors; nothing outside these tests builds a database this way.
+     */
+    fun databaseOnCallerThread(): TunenagiDatabase =
+        Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(), TunenagiDatabase::class.java)
+            .allowMainThreadQueries()
+            .setQueryExecutor { runnable -> runnable.run() }
+            .setTransactionExecutor { runnable -> runnable.run() }
+            .build()
+
     fun album(id: AlbumId = AlbumId.random(), title: String = "Dawn") =
         Album(id = id, title = title, year = 2026)
 
