@@ -1,6 +1,6 @@
 # Solar Pro 4 Agent Operating Profile
 
-Verified upstream model page: https://www.upstage.ai/blog/en/solar-pro-4 . **The exact platform exposing Solar Pro 4 (IDE, Freebuff, Hermes, OpenRouter, etc.) may impose independent time, tool and context limits.** “Free/unlimited” is a host plan statement, not a capability of this prompt. Do not assume context window, invocation format, native tool use or self-continuation without testing your actual host.
+Verified upstream model page: https://www.upstage.ai/blog/en/solar-pro-4 . **The exact platform exposing Solar Pro 4 (IDE, Hermes, OpenRouter, CLI, etc.) may impose independent time, tool and context limits.** “Free/unlimited” is a host plan statement, not a capability of this prompt. Do not assume context window, invocation format, native tool use or self-continuation without testing your actual host.
 
 ## Prompting strategy
 

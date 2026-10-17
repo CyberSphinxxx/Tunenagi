@@ -2,7 +2,7 @@
 
 ## Important
 
-An AI model does not run by itself; it needs an **agent host/CLI with file edit and terminal tools**. This kit does not include a Solar Pro 4 CLI or authenticate to Upstage/OpenRouter. The model may be selected inside Freebuff, Hermes, an IDE, or another compatible tool, but each host has different command syntax. **Do not invent a command.** Test one single prompt invocation manually first.
+An AI model does not run by itself; it needs an **agent host/CLI with file edit and terminal tools**. This kit does not include a Solar Pro 4 CLI or authenticate to Upstage/OpenRouter. The model may be selected inside Hermes, an IDE, or another compatible tool, but each host has different command syntax. **Do not invent a command.** Test one single prompt invocation manually first.
 
 ## Driver interface
 

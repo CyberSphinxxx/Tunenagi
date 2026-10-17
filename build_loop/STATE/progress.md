@@ -172,8 +172,7 @@ below is the original entry's content.
 - **Commit SHA**: 778c50e (this slice: code, gates, licence proposal and state)
 - **Blockers or risks**: the licence is still a **proposal** - no `LICENSE` file exists and
   publishing is not possible until the owner decides (see `LEGAL/LICENSE_PROPOSAL.md`).
-  ktlint/detekt adoption is deferred to TUN-0005. `.freebuff/` at the repository root is
-  another tool's local state and was deliberately left alone. The two new gate scripts are
+  ktlint/detekt adoption is deferred to TUN-0005. The two new gate scripts are
   enforcement code and need coverage by the phase-00 independent audit (ADR-004).
 - **Next exact action**: TUN-0005 (CI build and local verification commands) is next once
   TUN-0004 is verified; it must call `check_format.py`, `secret_scan.py` and the Gradle
@@ -276,7 +275,7 @@ below is the original entry's content.
   (`silent_install_safe.bat`) or attach a device, then
   `python SCRIPTS/device_evidence.py --task TUN-0003 --avd tunenagi_api33`.
 
-## 2026-10-14T04:00Z - Codebuff session (phase 00 completion and phase 01)
+## 2026-10-14T04:00Z - Implementation session (phase 00 completion and phase 01)
 
 - **Phase/tasks**: phase 00 audited and certified (TUN-0003, TUN-0006 verified on this session's
   evidence); phase 01 all seven tasks implemented and verified.
@@ -305,7 +304,7 @@ below is the original entry's content.
 - **Next exact action**: audit phase 01, then phase 02 (Media3 service and local playback), whose
   device half is deferred under ADR-008.
 
-## 2026-10-14T04:20Z - Codebuff session (phase 01 audit)
+## 2026-10-14T04:20Z - Audit session (phase 01 audit)
 
 - **Phase/tasks**: phase 01 audited. `STATE/audits/phase-01-20261014-0415.md` written; the
   machine-check certificate is `STATE/audits/phase-01-pass.json` (`taskctl.py audit 01`, exit 0).
@@ -334,7 +333,7 @@ below is the original entry's content.
 - **Next exact action**: phase 02 - the Media3 playback service and local playback path
   (`python SCRIPTS/taskctl.py next` to confirm eligibility).
 
-## 2026-10-14T04:35Z - Codebuff session (phase 02, TUN-0201)
+## 2026-10-14T04:35Z - Implementation session (phase 02, TUN-0201)
 
 - **Phase/tasks**: TUN-0201 verified (phase 02, 1/8). `python SCRIPTS/taskctl.py next` now points at
   TUN-0202 (local media discovery).
@@ -397,7 +396,7 @@ below is the original entry's content.
 - **Next exact action**: TUN-0202 - discover rights-cleared local media through MediaStore and SAF
   grants, and handle revocation and unavailable files.
 
-## 2026-10-15T20:30Z - Codebuff session (phase 02, TUN-0202)
+## 2026-10-15T20:30Z - Implementation session (phase 02, TUN-0202)
 
 - **Phase/tasks**: TUN-0202 verified (phase 02, 2/8). `python SCRIPTS/taskctl.py next` now points at
   TUN-0203 (local playable source resolver).
@@ -454,7 +453,7 @@ below is the original entry's content.
 - **Next exact action**: TUN-0203 - resolve a playable local source for a track and its `TrackSource`,
   with typed errors for unsupported formats, missing files and missing permission.
 
-## 2026-10-16T17:20Z - Codebuff session (phase 02, TUN-0203)
+## 2026-10-16T17:20Z - Implementation session (phase 02, TUN-0203)
 
 - **Phase/tasks**: TUN-0203 verified (phase 02, 3/8). `python SCRIPTS/taskctl.py next` now points at
   TUN-0204 (queue commands and shuffle repeat).
@@ -522,7 +521,7 @@ below is the original entry's content.
 - **Next exact action**: TUN-0204 - next/previous/seeking, add/remove/reorder, shuffle and repeat with
   bounded behaviour and state-transition tests.
 
-## 2026-10-16T17:50Z - Codebuff session (phase 02, TUN-0204)
+## 2026-10-16T17:50Z - Implementation session (phase 02, TUN-0204)
 
 - **Phase/tasks**: TUN-0204 verified (phase 02, 4/8). `python SCRIPTS/taskctl.py next` now points at
   TUN-0205 (playback state restoration).
