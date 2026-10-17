@@ -34,6 +34,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = ROOT if (ROOT / "gradlew").is_file() else ROOT.parent
 PY = sys.executable or "python"
 
 JDK_MIN = 17
@@ -61,7 +62,7 @@ JDK_SEARCH_GLOBS = (
 
 def gradle_command():
     """How to invoke the wrapper on this host, matching GIT_CONVENTIONS.md."""
-    if shutil.which("bash") and (ROOT / "gradlew").is_file():
+    if shutil.which("bash") and (REPO_ROOT / "gradlew").is_file():
         return ["bash", "gradlew"]
     if os.name == "nt":
         return [os.environ.get("COMSPEC", "cmd"), "/c", "gradlew.bat"]
@@ -152,8 +153,9 @@ def run_step(step, java_home):
         env["JAVA_HOME"] = str(java_home)
         env["PATH"] = str(Path(java_home) / "bin") + os.pathsep + env.get("PATH", "")
     started = time.monotonic()
+    step_cwd = REPO_ROOT if step.needs_java else ROOT
     try:
-        proc = subprocess.run(step.argv, cwd=ROOT, stdout=subprocess.PIPE,
+        proc = subprocess.run(step.argv, cwd=step_cwd, stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT, env=env, check=False)
         code = proc.returncode
         output = proc.stdout.decode("utf8", "replace")

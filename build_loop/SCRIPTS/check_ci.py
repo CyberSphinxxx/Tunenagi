@@ -26,7 +26,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = ROOT / ".github/workflows/ci.yml"
+REPO_ROOT = ROOT if (ROOT / ".github").is_dir() else ROOT.parent
+WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
 
 # C1: verified action pins. Sources are recorded so a future bump has somewhere to start.
 ALLOWED_USES = {
@@ -63,7 +64,8 @@ def normalize(command):
     if sys.executable:
         text = text.replace(sys.executable.replace("\\", "/"), "python")
     text = re.sub(r"python3(?:\.\d+)?\b", "python", text)
-    return re.sub(r"python\.exe\b", "python", text)
+    text = re.sub(r"python\.exe\b", "python", text)
+    return re.sub(r"^(?:(?:[A-Za-z]:/[^ ]+/cmd\.exe|cmd(?:\.exe)?) /c gradlew\.bat|\./gradlew)\b", "bash gradlew", text)
 
 
 def local_commands():

@@ -42,7 +42,7 @@ jobs:
       run:
         # The kit lives in a subdirectory of this repository, so every relative command
         # below would otherwise run in the wrong directory. check_ci.py enforces this.
-        working-directory: Tunenagi-Agent-Loop
+        working-directory: build_loop
     steps:
       - name: Check out the full history
         uses: actions/checkout@v7
@@ -72,7 +72,7 @@ jobs:
     needs: hygiene
     defaults:
       run:
-        working-directory: Tunenagi-Agent-Loop
+        working-directory: build_loop
     steps:
       - name: Check out
         uses: actions/checkout@v7

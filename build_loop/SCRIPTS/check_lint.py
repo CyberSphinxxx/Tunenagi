@@ -26,6 +26,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = ROOT if (ROOT / "app").is_dir() else ROOT.parent
 
 REPORTS = ("app/build/reports/lint-results-debug.xml", "core/build/reports/lint-results-debug.xml")
 ACCEPTED_WARNING_IDS = {"AndroidGradlePluginVersion", "GradleDependency"}
@@ -49,7 +50,7 @@ def check(paths):
     problems = []
     checked = 0
     for name in paths:
-        path = ROOT / name
+        path = (REPO_ROOT / name) if (REPO_ROOT / name).is_file() else (ROOT / name)
         if not path.is_file():
             problems.append(f"L3 missing lint report {name}; run the lint task first")
             continue

@@ -61,6 +61,10 @@ LENGTH_EXEMPT = {
     "SCRIPTS/run_check.py",
     "SCRIPTS/taskctl.py",
     "SCRIPTS/validate_package.py",
+    "build_loop/SCRIPTS/loop_driver.py",
+    "build_loop/SCRIPTS/run_check.py",
+    "build_loop/SCRIPTS/taskctl.py",
+    "build_loop/SCRIPTS/validate_package.py",
     "gradlew",
     "gradlew.bat",
 }

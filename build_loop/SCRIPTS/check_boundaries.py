@@ -36,6 +36,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = ROOT if (ROOT / "core").is_dir() else ROOT.parent
 GRAPH_DOC = "OPERATIONS/DEPENDENCY_GRAPH.md"
 
 ANDROID = ("android.", "androidx.")
@@ -114,24 +115,12 @@ SOURCE_PATH = re.compile(r"src/(?:main|test|sharedTest|androidTest)/java/(.+)/[^
 
 
 def tracked_files():
-    out = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, stdout=subprocess.PIPE, check=True).stdout
+    out = subprocess.run(["git", "ls-files", "-z"], cwd=REPO_ROOT, stdout=subprocess.PIPE, check=True).stdout
     return [name for name in out.decode("utf8").split("\0") if name]
 
 
-_PREFIX = None
-
-
-def checkout_prefix():
-    global _PREFIX
-    if _PREFIX is None:
-        out = subprocess.run(["git", "rev-parse", "--show-prefix"], cwd=ROOT,
-                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True).stdout
-        _PREFIX = out.decode("utf8").strip()
-    return _PREFIX
-
-
 def stored_text(name):
-    proc = subprocess.run(["git", "show", f":{checkout_prefix()}{name}"], cwd=ROOT,
+    proc = subprocess.run(["git", "show", f":{name}"], cwd=REPO_ROOT,
                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
     return proc.stdout.decode("utf8", "replace") if proc.returncode == 0 else None
 
@@ -388,7 +377,7 @@ def main():
     files = [path.replace("\\", "/") for path in (args.paths or tracked_files())]
 
     def read(name):
-        path = ROOT / name
+        path = (REPO_ROOT / name) if (REPO_ROOT / name).is_file() else (ROOT / name)
         return path.read_text(encoding="utf8") if path.is_file() else None
 
     reader = read if explicit else stored_text
