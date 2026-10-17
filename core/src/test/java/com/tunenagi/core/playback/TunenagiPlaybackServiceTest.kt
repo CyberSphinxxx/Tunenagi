@@ -424,14 +424,15 @@ class TunenagiPlaybackServiceTest {
         val at = Instant.parse("2026-10-17T00:00:00Z")
         val database = Fixtures.databaseOnCallerThread()
         val queue = RoomQueueRepository(database)
-        val tracks = listOf("One", "Two", "Three").map { title ->
-            val track = Fixtures.track(title = title)
-            database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at))
-            track.id
-        }
-        runBlocking {
-            queue.replaceQueue(tracks, startIndex = 1, at = at)
-            queue.saveProgress(42_000L, at)
+        val tracks = runBlocking {
+            listOf("One", "Two", "Three").map { title ->
+                val track = Fixtures.track(title = title)
+                database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at))
+                track.id
+            }.also { trackIds ->
+                queue.replaceQueue(trackIds, startIndex = 1, at = at)
+                queue.saveProgress(42_000L, at)
+            }
         }
 
         PlaybackResolution.install(PlaybackGraph(resolution = fixtureResolution(), queue = queue))
@@ -471,12 +472,12 @@ class TunenagiPlaybackServiceTest {
         val at = Instant.parse("2026-10-17T00:00:00Z")
         val database = Fixtures.databaseOnCallerThread()
         val queue = RoomQueueRepository(database)
-        val tracks = listOf("One", "Two").map { title ->
-            val track = Fixtures.track(title = title)
-            database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at))
-            track.id
-        }
         runBlocking {
+            val tracks = listOf("One", "Two").map { title ->
+                val track = Fixtures.track(title = title)
+                database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at))
+                track.id
+            }
             queue.replaceQueue(tracks, startIndex = 1, at = at)
             val state = database.playbackStateDao().current()!!
             // The pointer now names an item that does not exist, while the progress still does.
@@ -520,8 +521,10 @@ class TunenagiPlaybackServiceTest {
         val database = Fixtures.databaseOnCallerThread()
         val queue = RoomQueueRepository(database)
         val track = Fixtures.track(title = "Gone")
-        database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at))
-        runBlocking { queue.replaceQueue(listOf(track.id), startIndex = 0, at = at) }
+        runBlocking {
+            database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at))
+            queue.replaceQueue(listOf(track.id), startIndex = 0, at = at)
+        }
 
         val refusing = MediaItemResolution { requested ->
             Futures.immediateFailedFuture<List<MediaItem>>(
@@ -579,7 +582,7 @@ class TunenagiPlaybackServiceTest {
         val database = Fixtures.databaseOnCallerThread()
         val counting = CountingQueue(RoomQueueRepository(database))
         val track = Fixtures.track(title = "One")
-        database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at))
+        runBlocking { database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at)) }
 
         PlaybackResolution.install(PlaybackGraph(resolution = fixtureResolution(), queue = counting))
         try {
