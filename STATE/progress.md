@@ -584,3 +584,80 @@ below is the original entry's content.
   then nothing in the UI can reach the commands, and the phase-02 audit should read it that way.
 - **Next exact action**: TUN-0205 - persist the queue and the current position with debounced writes
   and restore them without starting playback by surprise.
+
+## 2026-10-18T18:40Z - Codebuff session (phase 02, TUN-0205)
+
+- **Phase/tasks**: TUN-0205 verified (phase 02, 5/8). `python SCRIPTS/taskctl.py next` now points at
+  TUN-0206 (media controls and audio focus).
+- **What was built**: `PlaybackProgressRecorder` owns "where the user was". It writes through
+  `QueueRepository.saveProgress` on exactly two kinds of checkpoint - explicit ones for the events
+  that make a stored position untrue (pause/resume, item transition, a user or queue-driven
+  discontinuity, end of item) and a periodic one every ten seconds while something plays, inside
+  `SPEC/DATA_MODEL.md`'s 5-15 s window and gated on monotonic time so a device clock change or a DST
+  jump cannot stretch or collapse it. It never writes on every audio tick, and it never writes a
+  position it cannot attribute: the player's index is resolved against the stored queue first and the
+  stored *current item* is moved to match, so an auto-advance cannot store "track 4, 0:07" for a user
+  who is listening to track 5. A finished item stores 0 rather than its duration, because a stored
+  position at the very end means the next launch's Play button plays nothing.
+- **A relaunch does not autoplay, by construction**: `PlaybackQueueCommands.restore` puts the stored
+  queue on a fresh player at the stored item and position and deliberately does not `prepare()` it -
+  no decoder, no audio-focus request, `playWhenReady == false`, player left in `STATE_IDLE` - so "the
+  OS created the service" is never read as a request for sound. The service runs that restore from
+  `onCreate` (launched, never blocking start-up) and holds a typed `UnresolvedMediaItemException` in
+  `restoreFailure` for the status surface TUN-0207 builds, instead of throwing from a scope where it
+  would crash the launch or swallowing it. A stored pointer to an item that no longer exists restarts
+  the queue at its first item with no position rather than resuming some other track mid-song.
+- **Swipe-away**: `onTaskRemoved` flushes the last checkpoint on a scope of its own, because Media3
+  stops the service from `super.onTaskRemoved` and `onDestroy` cancels the service scope - a flush on
+  that scope could be cancelled before Room ran the UPDATE. It stays best-effort by construction (a
+  database write cannot be awaited on the main thread), so the documented guarantee remains "at most
+  one interval of position is lost".
+- **Real defects the tests caught, fixed in the code**: the swipe-away flush read the player from
+  `Dispatchers.IO`, and Media3 *throws* `IllegalStateException: Player is accessed on the wrong
+  thread` - the test failed with that stack trace, not with a timing miss. The recorder now reads
+  every player-derived fact on the player's own thread (`Dispatchers.Main.immediate` by default) and
+  carries only numbers into the database work, and it records nothing once `stop()` has detached it,
+  because whoever stops a recorder is about to release its player. The second defect was a test of
+  mine that had never been run: `theStoredCurrentItemFollowsThePlayer` asserted the stored item moved
+  with the player without ever attaching the listener that moves it; it now does, and fails if the
+  listener is removed, which is the point of the test.
+- **Commands and exit codes (evidence paths)**:
+  - `python SCRIPTS/verify.py` -> exit 1, 7/9: `assemble` failed with
+    `The given file 'D:\...\Tunenagi-Agent-Loop\core\build\...\PlaybackQueueCommands$2.class' is
+    located outside the root directory 'D:\...\Tunenagi\core\build\...'` - stale incremental state
+    pointing at the kit's pre-move path (the repository was re-rooted by an external commit while
+    this task was in flight), not a code error
+    (`.../20261018T180428Z-verify-all-steps.json`). Cleaning the module build directories fixed it and
+    `:app:assembleDebug` then rebuilt green.
+  - `python SCRIPTS/run_check.py --task TUN-0205 --name verify-all-steps-2 -- python
+    SCRIPTS/verify.py` -> exit 2, 7/9: unit tests (156.6 s) and the APK green, `lint` and `lint-report`
+    failed on a locked lint-cache jar (`FileSystemException: ... being used by another process`), not
+    on a finding (`.../20261018T181243Z-verify-all-steps-2.json`). Stopping the Gradle daemons did not
+    release it; renaming the cache directory and rerunning `:app:lintDebug :core:lintDebug` -> exit 0.
+  - `python SCRIPTS/run_check.py --task TUN-0205 --name verify-all-steps-final -- python
+    SCRIPTS/verify.py` -> exit 0, 9/9 steps green (`.../20261018T182343Z-verify-all-steps-final.json`).
+    Gradle reported the test task up to date there, so the tests were then *really* re-executed on the
+    final tree: `--name core-tests-really-executed-2 -- bash gradlew :core:testDebugUnitTest
+    --rerun-tasks` -> exit 0, 37 tasks executed, 256 tests, 0 failures
+    (`.../20261018T183026Z-core-tests-really-executed-2.json`). The first attempt at that rerun exited
+    127 because `run_check.py` executes its argv directly and `./gradlew` is not a Windows binary; the
+    failed manifest is kept (`.../20261018T182812Z-core-tests-really-executed.json`).
+  - Every failed run above is kept. The stale-path and file-lock failures are environment, and are
+    described as such rather than counted as passes.
+- **Test totals now**: 281 JVM tests (`:core` 256 across 20 classes, `:app` 25 across 4), 0 failures.
+  The fifteen new ones are the relaunch/missing-pointer/unresolvable/recorder-lifecycle/swipe-away
+  service tests and the recorder's own cadence, attribution and ended-item tests.
+- **Device / emulator observations**: none possible (no device, no hypervisor driver). The substitute
+  is stated rather than implied: a real `ExoPlayer`, a real Room database and a service built by
+  Robolectric from that same store. They do **not** prove that a process really died between
+  sessions, that the OS restarts the service the way a device does, or that the stored millisecond
+  matches what a user hears. Recorded in `OPERATIONS/DEFERRED_VERIFICATION.md` (ADR-008).
+- **Blockers or risks**: the standing deferral, plus two honest limits of this slice - the swipe-away
+  checkpoint can lose up to one interval (10 s) of position because it cannot be awaited, and nothing
+  in the UI yet asks the session to restore or shows `restoreFailure`, which is TUN-0207's status
+  surface. The repo was also re-rooted mid-task by an external commit ("Initial Commit") that moved
+  the kit out of `Tunenagi-Agent-Loop/`; this task's code is inside that commit, so the TUN-0205
+  commit below carries the corrections rather than the whole slice, and the build cache had to be
+  cleaned once because of it.
+- **Next exact action**: TUN-0206 - media notification, lockscreen and Bluetooth/noisy handling, audio
+  focus loss/duck, and the service lifecycle that keeps them alive in the background.

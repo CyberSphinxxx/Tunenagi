@@ -208,6 +208,9 @@ class PlaybackProgressRecorderTest {
         val firstItem = room.snapshot().queue.first()
         val recorder = recorder()
         frozenNowMs = 0L
+        // The listener is what makes the move observable at all: without it the player advances and
+        // the store does not hear about it, which is the defect this test exists to catch.
+        recorder.start()
 
         player.seekToNextMediaItem()
         shadowOf(Looper.getMainLooper()).idle()

@@ -429,9 +429,11 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "in_progress",
-      "evidence": [],
-      "notes": "Claimed 2026-10-16T18:07:23+00:00"
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0205\\20261018T182343Z-verify-all-steps-final.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-18T18:34:10+00:00; semantic review still required."
     },
     {
       "id": "TUN-0206",
