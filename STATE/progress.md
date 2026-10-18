@@ -612,6 +612,15 @@ below is the original entry's content.
   that scope could be cancelled before Room ran the UPDATE. It stays best-effort by construction (a
   database write cannot be awaited on the main thread), so the documented guarantee remains "at most
   one interval of position is lost".
+- **The swipe-away fix has two halves**: the recorded defect was the wrong-thread read; the ordering
+  that made it matter is separate. A flush launched on `Dispatchers.IO` queues its player read behind
+  whatever the main thread does next - and what the main thread does next can be `onDestroy`
+  releasing the player, which is the very object the position has to be read from. `onTaskRemoved`
+  now launches the flush on an immediate main-thread scope of its own
+  (`TunenagiPlaybackService.lastCheckpointScope`), so the player facts are read *before*
+  `super.onTaskRemoved` can stop anything and only the database write is left asynchronous. No test
+  can prove a race that did not happen, so this is a design argument, stated as one, on top of the
+  ordering the swipe-away test does exercise.
 - **Real defects the tests caught, fixed in the code**: the swipe-away flush read the player from
   `Dispatchers.IO`, and Media3 *throws* `IllegalStateException: Player is accessed on the wrong
   thread` - the test failed with that stack trace, not with a timing miss. The recorder now reads
@@ -635,7 +644,11 @@ below is the original entry's content.
     on a finding (`.../20261018T181243Z-verify-all-steps-2.json`). Stopping the Gradle daemons did not
     release it; renaming the cache directory and rerunning `:app:lintDebug :core:lintDebug` -> exit 0.
   - `python SCRIPTS/run_check.py --task TUN-0205 --name verify-all-steps-final -- python
-    SCRIPTS/verify.py` -> exit 0, 9/9 steps green (`.../20261018T182343Z-verify-all-steps-final.json`).
+    SCRIPTS/verify.py` -> exit 0, 9/9 steps green (`.../20261018T182343Z-verify-all-steps-final.json`). After the
+    swipe-away ordering change described below, the same command was run again:
+    `--name verify-after-teardown-order` -> exit 0, 9/9 with the tests, the APK and lint really
+    executing (60.0 s / 19.3 s / 82.4 s), plus the playback suites filtered -> exit 0
+    (`.../20261018T183636Z-verify-after-teardown-order.json`).
     Gradle reported the test task up to date there, so the tests were then *really* re-executed on the
     final tree: `--name core-tests-really-executed-2 -- bash gradlew :core:testDebugUnitTest
     --rerun-tasks` -> exit 0, 37 tasks executed, 256 tests, 0 failures
@@ -644,6 +657,11 @@ below is the original entry's content.
     failed manifest is kept (`.../20261018T182812Z-core-tests-really-executed.json`).
   - Every failed run above is kept. The stale-path and file-lock failures are environment, and are
     described as such rather than counted as passes.
+- **Audit of this slice**: the "no unwanted autoplay" test was checked for teeth by mutating the
+  code it protects. `PlaybackQueueCommands.restore` was temporarily forced to `play = true,
+  prepare = true` -> `aRelaunchRestoresTheStoredQueueWithoutStartingPlayback` failed (BUILD FAILED,
+  exit 1); the file was then restored (`git diff` empty) and the playback suites rerun green. A test
+  that passes because the code happens to be right is not evidence that it would catch a regression.
 - **Test totals now**: 281 JVM tests (`:core` 256 across 20 classes, `:app` 25 across 4), 0 failures.
   The fifteen new ones are the relaunch/missing-pointer/unresolvable/recorder-lifecycle/swipe-away
   service tests and the recorder's own cadence, attribution and ended-item tests.

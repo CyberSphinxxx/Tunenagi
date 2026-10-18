@@ -46,6 +46,16 @@ open class TunenagiPlaybackService : MediaLibraryService() {
     private val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     /**
+     * The scope the last checkpoint is dispatched on when the task goes away.
+     *
+     * Its own scope, so [onDestroy]'s cancellation of [sessionScope] cannot take the write with it;
+     * `Main.immediate`, so the flush reads the player on this callback's thread before anything else
+     * can run. The job is never cancelled - the write is one statement and the process, not the
+     * service, decides when to reclaim it.
+     */
+    private val lastCheckpointScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /**
      * The callback the session was built with.
      *
      * Held as a named field rather than constructed inline so a test can drive the same instance
@@ -161,14 +171,19 @@ open class TunenagiPlaybackService : MediaLibraryService() {
      *   `super.onTaskRemoved` when nothing is playing, and [onDestroy] cancels that scope - a flush
      *   launched on it could be cancelled before Room had run the UPDATE. The last checkpoint is
      *   therefore dispatched on a scope of its own, which is one write and then unreachable.
-     * - **It cannot be awaited.** `onTaskRemoved` runs on the main thread and a database write is
-     *   asynchronous, so this is best-effort by construction: the honest guarantee remains "at most
-     *   one interval of position is lost", and this narrows it for the swipe-away case instead of
-     *   pretending to close it.
+     * - **It starts on this thread, not on a background one.** The player may only be read on the
+     *   main thread (Media3 enforces it), and it may be released by [onDestroy] as soon as this
+     *   callback returns. A flush launched on `Dispatchers.IO` would queue its player read behind
+     *   whatever the main thread does next - including that release - so the numbers would be read
+     *   after they stopped existing. An immediate main-thread launch reads them *now*, before
+     *   `super.onTaskRemoved` can stop anything, and only the database part is left asynchronous.
+     * - **It cannot be awaited.** A database write is asynchronous, so this is best-effort by
+     *   construction: the honest guarantee remains "at most one interval of position is lost", and
+     *   this narrows it for the swipe-away case instead of pretending to close it.
      */
     override fun onTaskRemoved(rootIntent: Intent?) {
         progressRecorder?.let { recorder ->
-            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { recorder.flush() }
+            lastCheckpointScope.launch { recorder.flush() }
         }
         super.onTaskRemoved(rootIntent)
     }

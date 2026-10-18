@@ -431,7 +431,9 @@
       ],
       "status": "verified",
       "evidence": [
-        "STATE\\evidence\\TUN-0205\\20261018T182343Z-verify-all-steps-final.json"
+        "STATE\\evidence\\TUN-0205\\20261018T182343Z-verify-all-steps-final.json",
+        "STATE\\evidence\\TUN-0205\\20261018T183026Z-core-tests-really-executed-2.json",
+        "STATE\\evidence\\TUN-0205\\20261018T183636Z-verify-after-teardown-order.json"
       ],
       "notes": "Verified via evidence manifest 2026-10-18T18:34:10+00:00; semantic review still required."
     },
