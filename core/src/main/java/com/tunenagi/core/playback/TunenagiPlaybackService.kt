@@ -1,7 +1,9 @@
 package com.tunenagi.core.playback
 
 import android.content.Intent
+import androidx.annotation.OptIn
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
 import kotlinx.coroutines.CoroutineScope
@@ -66,7 +68,15 @@ open class TunenagiPlaybackService : MediaLibraryService() {
      * is created by the OS, so it has no constructor to be handed one (ADR-013). Reading it here
      * means the session and its callback cannot disagree about how a media id is resolved.
      */
-    internal val sessionCallback = TunenagiMediaLibraryCallback(PlaybackResolution.current().resolution)
+    internal val sessionCallback = PlaybackResolution.current().let { graph ->
+        // The queue is the same graph the commands persist through, and the scope is this service's:
+        // a resumption read must not outlive the service that would apply its answer.
+        TunenagiMediaLibraryCallback(
+            resolution = graph.resolution,
+            queue = graph.queue,
+            scope = sessionScope
+        )
+    }
 
     /**
      * The queue commands this session applies, or `null` when the host installed no library.
@@ -110,8 +120,14 @@ open class TunenagiPlaybackService : MediaLibraryService() {
     /** The session this service owns, or `null` before [onCreate] / after [onDestroy]. */
     internal val ownedSession: MediaLibraryService.MediaLibrarySession? get() = library
 
+    @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
+        // Installed before the session exists, because MediaSessionService reads the provider once
+        // when the session is added. Media3 owns when the notification is posted, updated, moved to
+        // the foreground and removed; this only fixes the channel and the notification id
+        // (`TunenagiNotifications` explains why those are part of the contract).
+        setMediaNotificationProvider(TunenagiNotifications.provider(this))
         val playbackEngine = TunenagiPlaybackEngine(this)
         engine = playbackEngine
         val graph = PlaybackResolution.current()

@@ -23,6 +23,7 @@ A substitute is used for the parts that can honestly be substituted, and nothing
 | Local source resolution (TUN-0203) | real header bytes supplied to the real sniffer and resolver, plus a real Room database with the real unique indices | the container decision from bytes, the typed errors for unsupported/gone/denied, the format and availability written back, the media-id convention | opening a file through a real `ContentResolver`/MediaStore/SAF grant, and a device decoder actually accepting the container the header announced |
 | Queue commands and transitions (TUN-0204) | the real `PlaybackQueueCommands` driven against a **real** `ExoPlayer` and a real Room database, asserting the player's own queue, current index, `playWhenReady`, repeat/shuffle state and the persisted snapshot | that a `next`/`previous`/`remove`/`move`/`shuffle` really changes what is stored and what the player will play, including the 3-second Previous threshold and repeat/shuffle policies | that audio plays, that a seek lands where the user *hears* it, that an edit is gapless, or that the queue survives process death; the fixture uri points at no file and no decoder is involved |
 | State restoration (TUN-0205) | the real `PlaybackProgressRecorder` and `PlaybackQueueCommands.restore` driven against a **real** `ExoPlayer` and a real Room database, plus a service built by Robolectric from the same store | that the queue, the current item and the position are written at a bounded cadence (an interval gate that a test can move by hand), that a relaunch puts them back on a fresh player with `playWhenReady == false` and the player left `STATE_IDLE`, that a stored pointer to an item that no longer exists restarts the queue rather than resuming *some* track mid-song, and that an unresolvable queue leaves an empty player instead of a broken one | that the process really died between sessions (no JVM test can kill one), that the OS creates the service the way a device does on relaunch, or that a position a user *hears* matches the stored millisecond |
+| Media controls, focus and interruptions (TUN-0206) | a **real** `ExoPlayer` and a Robolectric-built `MediaSessionService`: the notification provider built from the app's settings, an `ACTION_AUDIO_BECOMING_NOISY` broadcast delivered to the player, `ShadowAudioManager`'s record of the audio-focus request, and `onPlaybackResumption` answered from a real Room queue | that the media notification names the app's low-importance, non-vibrating channel; that losing the audio route pauses and that nothing resumes on reconnect; that playing takes `AUDIOFOCUS_GAIN` and stopping gives it back; that the platform resumption path returns the stored items/index/position, only to a trusted controller, and fails with the typed resolution error when the file is gone | a notification or lockscreen card a user can see, Bluetooth AVRCP/headset media buttons, the OS actually invoking `onPlaybackResumption` on a cold start, focus loss during a call and audible ducking, the foreground-service lifecycle under screen-off, and the UX of a denied `POST_NOTIFICATIONS` |
 | Provider integration | MockWebServer fixtures of the real payloads | request shape, parsing, error/rate-limit mapping, retry policy | live network, real catalog contents, upstream policy/entitlement changes |
 | Storage | Room in-memory + migration tests on the JVM | schema, DAO queries, migration correctness | real on-device storage behaviour, process death, large real libraries |
 | Live third-party smoke | none | — | an actual Audius/LRCLIB/MusicBrainz request never happened; no live artifact exists |
@@ -72,6 +73,19 @@ A substitute is used for the parts that can honestly be substituted, and nothing
   is scheduled with the queue UI in TUN-0703, because Media3's controller surface cannot express the
   previous-threshold or materialised-shuffle policies. Until then this is a verified session-side
   capability, not a user-visible feature, and the phase-02 audit must read it that way.
+- **Media controls (TUN-0206)**: the service declares itself as a media session/playback service,
+  installs a low-importance notification channel before its session exists, routes media buttons
+  through an exported `MediaButtonReceiver`, and pauses when the audio route goes noisy. Those are
+  asserted on the JVM against the real Media3 classes, but Media3 only posts the notification while a
+  *connected controller* has a non-idle queue, and a real controller connection needs the platform's
+  service binding rather than the Robolectric-instantiated service the tests use. Therefore what has
+  never happened here: a notification in the shade or on a lockscreen, a headset/Bluetooth button
+  during a cold start, Android's own call to `onPlaybackResumption`, focus loss during a phone call,
+  ducking for navigation, and the foreground-service lifecycle with the screen off. Focus *request*
+  and *release* are real platform calls the tests can see; focus *loss policy* is Media3's
+  `AudioFocusManager` and is asserted only as delegation (`handleAudioFocus = true`). The
+  `POST_NOTIFICATIONS` request is also unrendered: its rule is unit-tested, but the system dialog and
+  the denied-permission experience need a device.
 
 ## Rule for later sessions (do not drift)
 

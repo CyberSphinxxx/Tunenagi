@@ -455,9 +455,13 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0206\\20261019T072533Z-verify-final.json",
+        "STATE\\evidence\\TUN-0206\\20261019T072658Z-tests-really-executed-2.json",
+        "STATE\\evidence\\TUN-0206\\20261019T072435Z-lint-after-suppress.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-19T07:30:20+00:00; semantic review still required."
     },
     {
       "id": "TUN-0207",

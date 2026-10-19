@@ -679,3 +679,79 @@ below is the original entry's content.
   cleaned once because of it.
 - **Next exact action**: TUN-0206 - media notification, lockscreen and Bluetooth/noisy handling, audio
   focus loss/duck, and the service lifecycle that keeps them alive in the background.
+
+## 2026-10-19T07:30Z — Codebuff session (phase 02, TUN-0206)
+
+- **Phase/task**: Phase 02 / TUN-0206 "Media controls and audio focus" — claimed, implemented and
+  verified (`taskctl verify`), phase 02 now 6/8. The next eligible task is TUN-0207.
+- **Summary/change paths**:
+  - `core/src/main/AndroidManifest.xml`: declared `POST_NOTIFICATIONS`, the
+    `MediaSessionService` intent action, and the exported `MediaButtonReceiver` (the cold-start
+    headset/Bluetooth route). `PLAYBACK` already had the foreground-service permissions.
+  - `core/.../playback/TunenagiNotifications.kt` (new) + `core/src/main/res/values/strings.xml`:
+    one fixed channel id, notification id and channel-name resource, and the
+    `DefaultMediaNotificationProvider` built from them; `TunenagiPlaybackService.onCreate`
+    installs it before the session exists.
+  - `core/.../playback/TunenagiMediaLibraryCallback.kt`: implemented `onPlaybackResumption` — the
+    platform media-resumption contract — answering with the stored, late-resolved queue and
+    position for a trusted controller only. This is the one path allowed to start sound after the
+    app is gone; every other restore stays silent (TUN-0205).
+  - `core/.../playback/PlaybackQueueCommands.kt`: one shared `QueueItem.requestedMediaItem()`
+    mapping so commands and resumption cannot disagree about the media-id convention; the stale
+    "not wired yet" note now points at the callback.
+  - `core/.../playback/TunenagiPlaybackEngine.kt`: explicit `setHandleAudioBecomingNoisy(true)`
+    (pause on unplug/loss, never auto-resume) and `WAKE_MODE_LOCAL` for screen-off playback.
+  - `app/.../NotificationPermission.kt` (new) + `MainActivity`: ask for `POST_NOTIFICATIONS` once,
+    on API 33+, with an empty result callback — playback never depends on the answer. The
+    `InlinedApi` lint suppression is justified in the code: the constant only exists from API 33
+    and is used only behind the SDK check.
+  - Tests: `core/.../PlaybackControlsTest.kt` (7) covers notification channel/provider identity,
+    noisy pause + no resume, focus request/stop, trusted/refused/empty/unresolvable resumption;
+    `app/.../NotificationPermissionTest.kt` (4) and two new manifest assertions in
+    `PlaybackManifestTest` (POST_NOTIFICATIONS, MediaSessionService action, exported receiver).
+- **Commands and exit codes (evidence paths)**:
+  - `python SCRIPTS/run_check.py --task TUN-0206 --name verify-all-steps -- python SCRIPTS/verify.py`
+    -> exit 2, 7/9: unit tests and the APK green; `lint` failed with seven
+    `UnsafeOptInUsageError` findings on Media3's notification-provider surface, and `lint-report`
+    reported them. Not a runtime defect, but a real gate failure; kept
+    (`STATE/evidence/TUN-0206/20261019T071749Z-verify-all-steps.json`).
+  - Fix: per-function `@OptIn(UnstableApi::class)` in `TunenagiNotifications` and the service's
+    `onCreate`. Re-running only lint/lint-report through `run_check` -> exit 0
+    (`.../20261019T072435Z-lint-after-suppress.json`).
+  - Second full verify -> exit 2, 8/9: lint then reported two new `InlinedApi` warnings for
+    `Manifest.permission.POST_NOTIFICATIONS` on the API 26 minimum
+    (`.../20261019T072130Z-verify-after-optin.json`). Fixed with a documented
+    `@SuppressLint("InlinedApi")` at the two call sites (the SDK guard is what makes it safe), not
+    with a string copy of the platform constant.
+  - Final `python SCRIPTS/run_check.py --task TUN-0206 --name verify-final -- python SCRIPTS/verify.py`
+    -> exit 0, 9/9 steps green: package, format, secrets, CI definition, boundaries, both unit-test
+    suites, `assembleDebug`, lint and lint-report (`.../20261019T072533Z-verify-final.json`).
+  - The final verify reported the test task as up to date, so the tests were re-executed on the
+    final tree: `--name tests-really-executed-2 -- bash gradlew :core:testDebugUnitTest
+    :app:testDebugUnitTest --rerun-tasks` -> exit 0, 71 tasks executed, 294 tests, 0 failures
+    (`.../20261019T072658Z-tests-really-executed-2.json`). The first attempt exited 1 because the
+    shell's default `java` is 25.0.1 and it was not the JDK-21 environment `verify.py` discovers by
+    itself; that failed manifest is kept
+    (`.../20261019T072645Z-tests-really-executed.json`).
+  - Test totals: `:core` 263 tests / 21 classes, `:app` 31 / 5, 0 failures. The thirteen new tests
+    are the seven above plus four permission-policy tests and two manifest assertions.
+- **Audit of this slice**: the noisy-handling test was checked for teeth by mutating the code it
+  protects — `.setHandleAudioBecomingNoisy(true)` changed to `false`, the test failed (BUILD FAILED,
+  exit 1), the file was restored and the suite re-run green. The resumption tests use the real
+  service callback, a real Room queue and the real resolver seam, so removing the graph wiring makes
+  them answer nothing instead of the stored queue.
+- **Device / emulator observations**: none possible (no device, no emulator). The substitute is a
+  real `ExoPlayer`, a Robolectric-built `MediaSessionService`, a real Room database and the real
+  `DefaultMediaNotificationProvider`; it proves channel identity, noisy pause, focus request/release
+  and the resumption contract, but not a visible notification/lockscreen card, a Bluetooth AVRCP
+  button, the OS invoking resumption on a cold start, focus loss during a call, ducking, or
+  foreground-service survival with the screen off. Recorded in
+  `OPERATIONS/DEFERRED_VERIFICATION.md` (ADR-008).
+- **Blockers or risks**: the standing device deferral; Media3 posts a notification only while a
+  connected controller has a non-idle queue, which a Robolectric service instance cannot satisfy, so
+  the posting path itself is delegated to Media3 and deferred. Focus *loss* policy is likewise
+  Media3's `AudioFocusManager`, asserted only as delegation plus the platform request/release the
+  shadow can see.
+- **Next exact action**: TUN-0207 — buffering/error/retry state with timeout, cancellation, missing
+  track and codec failures, bounded retry and concurrency tests; also the surface that shows the
+  service's held `restoreFailure`.
