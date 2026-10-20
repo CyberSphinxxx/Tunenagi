@@ -590,3 +590,46 @@ queue UI), phase 04 (MediaStore and the library surface).
 
 **Owner review needed?** No: it implements an action ADR-003 already promised for this phase, and no
 product requirement or acceptance criterion changed.
+
+## ADR-017 - Audius is read with the documented identity, and a missing key is not a workaround (2026-10-20)
+
+**Context**: TUN-0301 needs the documented search/trending contract, and `SPEC/PROVIDERS.md`
+requires re-reading the current docs rather than assuming an older blog post. The check on
+2026-10-20 found: the canonical root is `https://api.audius.co` (the old
+`discoveryprovider.audius.co` host is deprecated); search is `GET /v1/tracks/search` with `query`,
+`limit`, `offset`; trending is `GET /v1/tracks/trending`; the current official search example sends
+an `x-api-key` header and describes the read-only key as safe for client use; `app_name` is the
+documented client identification used by examples; the official SDK plans page lists 10 req/s and
+500k requests/month on the free plan. No Audius credential exists in this repository, and AGENTS.md
+forbids inventing one.
+
+**Options**: (a) send only `app_name` and assume anonymous reads will always work; (b) require an
+API key before shipping discovery, blocking TUN-0301 until the owner supplies one; (c) build the
+client to send the documented identity it has (User-Agent + `app_name`), accept an optionally
+injected read-only key, and surface a refusal as `Unauthorized` instead of silently finding another
+route.
+
+**Decision**: (c). The key is a constructor parameter with a null default, never a `BuildConfig`
+value and never committed. The client pins the canonical HTTPS host, refuses a non-HTTPS base at
+construction, sends no undocumented parameter (`time`, `sort`, host-discovery rotation), and follows
+only HTTPS redirects to an explicitly allowed host. Pagination is offset-based with a page size
+bounded at 100; a full page offers `nextOffset`, a short or empty page ends paging.
+
+**Consequences**:
+- An anonymous refusal is an honest state the UI can show (TUN-0305), not a reason to scrape, rotate
+  hosts or guess a different endpoint.
+- The live smoke (TUN-0306) and any real user discovery may need an owner-supplied key. That is an
+  external dependency recorded before it bites, not discovered during the smoke.
+- The contract tests in `AudiusApiTest` use fixtures written from the documented shape, explicitly
+  not captured live, because CI must not call the provider. `OkHttpTransportTest` uses a real
+  `MockWebServer` for the HTTP behaviour. Neither is live proof.
+- `Retry-After` is parsed in the transport (seconds or HTTP-date) and mapped by the taxonomy;
+  bounded retry policy remains TUN-0304's subject.
+- The DTO keeps provider fields (nullable title, seconds) and does not normalize; TUN-0302 owns the
+  mapping and the entitlement decision.
+
+**Affected tasks**: TUN-0301 (this slice), TUN-0302, TUN-0303, TUN-0304, TUN-0305, TUN-0306.
+
+**Owner review needed?** Yes before any live discovery/streaming claim: an Audius read key may have
+to be provided, and the key must be supplied through the build environment or a local untracked
+file, never committed.
