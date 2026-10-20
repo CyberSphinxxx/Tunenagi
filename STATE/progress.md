@@ -11,3 +11,18 @@
 - **Blockers or risks**: no live Audius call (ADR-017: no credential exists; TUN-0306 owns the live smoke). Restricted rows are kept rather than dropped, so TUN-0303 and TUN-0305 must check `SourceAvailability.isPlayable` before resolving. No new P0 blocker.
 - **Commit SHA**: see the TUN-0302 commit added after this entry.
 - **Next exact action**: claim TUN-0303 (public stream resolver), which depends on TUN-0301 and TUN-0302.
+
+## 2026-10-21T06:40Z - Buffy session (phase 03, TUN-0303)
+
+- **Phase/task**: Phase 03 / TUN-0303 "Public stream resolver" - implemented, executed and recorded from `run_check.py` manifests.
+- **Summary**: `AudiusStreamResolver` completes `PlaybackSourceResolver` for Audius using the provider's own OpenAPI document read on 2026-10-21 (`GET /v1/tracks/{track_id}/stream`, `no_redirect=true` -> `stream_url_response { data }`, security `[{}, OAuth2 read]`). It refuses a `SourceAvailability.Restricted` source before any request, refuses a non-Audius source and an id that could escape its path segment, then makes one documented request with exactly `app_name` and `no_redirect=true`. The returned URL must be HTTPS with a real authority (plain HTTP only for loopback under the test flag); a redirect is never followed, no signature/token/preview is ever sent, and the reference carries the app's own 10-minute re-resolution budget (not a provider expiry, which the API does not document) and no invented mime type.
+- **Design record**: ADR-018 in `STATE/decisions.md` covers the JSON-not-redirect decision, the failure taxonomy, the freshness budget and the known limitation that gated-but-streamable rows fail late at resolve.
+- **Change paths**: `core/src/main/java/com/tunenagi/core/provider/audius/AudiusStreamResolver.kt`, `core/src/main/java/com/tunenagi/core/provider/audius/AudiusApi.kt` (stream path constants), `core/src/test/java/com/tunenagi/core/provider/audius/AudiusStreamResolverTest.kt`, `STATE/audits/phase-03-20261021-tun0303.md`, `STATE/decisions.md`, `OPERATIONS/DEFERRED_VERIFICATION.md`.
+- **Commands and exit codes (evidence paths)**:
+  - `bash gradlew :core:testDebugUnitTest --tests "com.tunenagi.core.provider.audius.AudiusStreamResolverTest" --rerun` -> exit 0; 12 tests, 0 failures, 0 skipped (`STATE/evidence/TUN-0303/20261020T223552Z-audius-stream-resolver-tests.json`). An earlier run failed (`...223452Z...`) because a userinfo URL was accepted; the fix is in this slice and the failing manifest was kept.
+  - `python SCRIPTS/verify.py` -> exit 0, `VERDICT: PASS - 9 step(s) green`; unit-tests (43.6s), assemble (13.2s) and lint (85.7s) executed (`STATE/evidence/TUN-0303/20261020T223637Z-verify-all-steps.json`).
+- **Device / emulator observations**: none - ADR-008 deferral. The substitute is the loopback `MockWebServer` through the production transport; it cannot prove a live content node, a device decoder, or audible output.
+- **Blockers or risks**: no live Audius call (ADR-017) - TUN-0306 owns the rate-respecting live smoke and needs a device plus a currently permitted public track. The resolver is not installed in the app graph yet; TUN-0305/TUN-0306 own that. Discovery does not read `is_stream_gated`, so a gated-but-streamable row fails at resolve with 401 rather than being pre-marked unplayable (ADR-018 follow-up).
+- **Commit SHA**: see the TUN-0303 commit added after this entry.
+- **Next exact action**: claim TUN-0304 (provider rate/failure recovery): 429 `Retry-After`, 403, 5xx, offline, timeout and cancellation with bounded retry tests, reusing the resolver's typed failures.
+

@@ -633,3 +633,47 @@ bounded at 100; a full page offers `nextOffset`, a short or empty page ends pagi
 **Owner review needed?** Yes before any live discovery/streaming claim: an Audius read key may have
 to be provided, and the key must be supplied through the build environment or a local untracked
 file, never committed.
+
+## ADR-018 - A stream URL is asked for as JSON, checked, and never stored (2026-10-21)
+
+**Context**: TUN-0303 must play a public Audius track with late URL resolution, expiry handling and
+no bypass. Re-reading the provider's OpenAPI document on 2026-10-21 (`https://api.audius.co/v1/swagger.yaml`)
+found `GET /tracks/{track_id}/stream` (server root `/v1`) with a `no_redirect` parameter documented
+as "If true will not return a 302 and instead will return the stream url in JSON", a `200` schema
+`stream_url_response = { data: string }`, and a security list of `[{}, OAuth2 read]` where the empty
+requirement means a public track needs no credential. The protocol's gate documentation says a track
+with `access_authorities` answers `401` to an unsigned request. The document promises no stream-URL
+lifetime.
+
+**Options**: (a) call the endpoint, follow its `302` to the content node and hand whatever final URL
+arrives to the player; (b) ask for JSON with `no_redirect=true`, validate the returned URL against
+the app's transport policy, and hand the player that URL; (c) request a `preview` or a download URL
+so the audio is fetched by the app instead of streamed.
+
+**Decision**: (b). The resolver sends exactly `app_name` and `no_redirect=true`, accepts only
+`{data: <url>}`, and refuses anything that is not HTTPS (plain HTTP only to the loopback hosts in
+the production transport's closed list, and only under the test flag) or that has no trustworthy
+host. It never sends a signature, an access token, `preview` or `skip_play_count`, and never tries a
+second endpoint if the first refuses.
+
+**Consequences**:
+- A redirect is a typed failure, not a detour: the app, not an HTTP hop, decides which host the
+  player opens, and the transport's audio-body budget is never hit by a `200` that turns out to be
+  an MP3.
+- `ProviderError` keeps its distinctions (`404` NotFound, `401` Unauthorized, `403` Restricted, `429`
+  Throttled with `Retry-After`, unreadable body MalformedPayload). Bounded retry of the transient
+  ones remains TUN-0304's subject; the resolver makes one attempt.
+- The returned reference carries `expiresAt = now + 10 minutes` as **this app's** re-resolution
+  budget, not as a provider fact, because the API documents no expiry. Nothing stores the URL: a
+  media id names a source, and the stream is resolved again on the next playback.
+- `mimeType` stays null. The bytes are never fetched, so claiming `audio/mpeg` from the endpoint's
+  summary would be a format claim the app cannot back; Media3 sniffs progressive audio itself.
+- A track that is `is_streamable` but gated by `access_authorities` is not visible as gated in the
+  discovery DTOs (TUN-0302's mapping never read `is_stream_gated`), so it fails at resolve with the
+  provider's `401` rather than being pre-marked unplayable. The failure is honest but late; surfacing
+  it earlier is a follow-up for TUN-0305/TUN-0307, not a silent bypass.
+
+**Affected tasks**: TUN-0303 (this slice), TUN-0304, TUN-0305, TUN-0306, TUN-0307.
+
+**Owner review needed?** No new decision for the owner: no credential is required or invented. The
+live smoke (TUN-0306) still needs a real device and a currently permitted public track.

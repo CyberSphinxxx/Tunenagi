@@ -578,9 +578,11 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0303\\20261020T223552Z-audius-stream-resolver-tests.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-20T22:42:26+00:00; semantic review still required."
     },
     {
       "id": "TUN-0304",

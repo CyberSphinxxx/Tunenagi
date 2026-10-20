@@ -148,6 +148,10 @@ class AudiusApi(
         const val DEFAULT_BASE_URL = "https://api.audius.co"
         const val SEARCH_PATH = "/v1/tracks/search"
         const val TRENDING_PATH = "/v1/tracks/trending"
+
+        /** The documented stream endpoint is `/v1/tracks/{track_id}/stream`; TUN-0303 owns its use. */
+        const val STREAM_PATH_PREFIX = "/v1/tracks/"
+        const val STREAM_PATH_SUFFIX = "/stream"
         const val DEFAULT_PAGE_SIZE = 20
 
         /** A documented maximum is not exposed by the API reference; 100 keeps one page bounded. */
