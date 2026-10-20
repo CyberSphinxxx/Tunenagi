@@ -1,6 +1,7 @@
 package com.tunenagi.player.playback
 
 import kotlinx.coroutines.flow.StateFlow
+import com.tunenagi.core.model.TrackId
 
 /**
  * What the UI is allowed to know about playback — owned.
@@ -45,6 +46,16 @@ interface NowPlayingSource {
 
     /** Starts playback when paused, pauses when playing. A no-op with nothing loaded. */
     fun togglePlayPause()
+
+    /**
+     * Replaces the session's queue with [trackIds] and starts it.
+     *
+     * The ids are tracks, not resolved uris: only the media id crosses the process boundary, and
+     * the session turns it into a playable item through the library (which is also where a source
+     * that has become unavailable is reported). A no-op before the controller is attached; the
+     * caller can see that the connection did not become `Connected`.
+     */
+    fun playTracks(trackIds: List<TrackId>)
 
     /**
      * Retries the item playback stopped on. A no-op with nothing attached.

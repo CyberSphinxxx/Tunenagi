@@ -251,6 +251,11 @@ class PlaybackQueueCommands(
         val index = snapshot.queue.indexOfFirst { it.id == snapshot.currentItemId }.coerceAtLeast(0)
         val items = resolved(snapshot.queue.map { item(it) })
         player.setMediaItems(items, index, resumeMs)
+        // The repeat mode is part of the stored queue's state, not a preference of this particular
+        // player: a service restart builds a new player whose default is off, and Media3's own
+        // advance at the end of a track follows the player rather than [next]. Re-applying it here
+        // is what makes "Repeat All" survive a relaunch instead of silently becoming "Off".
+        player.repeatMode = snapshot.repeatMode.toPlayerRepeatMode()
         // `prepare` is what turns the ids into audio; `play` is only ever true when the caller asked
         // for sound (a new queue, or the platform's resumption contract) or something was already
         // playing (an edit mid-listen), so a command never starts playback the user had paused.

@@ -33,6 +33,7 @@ import androidx.navigation.compose.rememberNavController
 import com.tunenagi.core.designsystem.ShellLayout
 import com.tunenagi.core.designsystem.TunenagiMotion
 import com.tunenagi.core.designsystem.TunenagiWindowSize
+import com.tunenagi.player.libraryimport.ImportUiState
 import com.tunenagi.player.ui.screens.HomeScreen
 import com.tunenagi.player.ui.screens.LibraryScreen
 import com.tunenagi.player.ui.screens.PlayerScreen
@@ -60,6 +61,8 @@ fun TunenagiShell(
     playerState: MiniPlayerState = MiniPlayerState.None,
     onTogglePlayPause: () -> Unit = {},
     onRetryPlayback: () -> Unit = {},
+    importState: ImportUiState = ImportUiState.Idle,
+    onImportMusic: () -> Unit = {},
     layout: ShellLayout = TunenagiWindowSize.layoutFor(LocalConfiguration.current.screenWidthDp),
     navController: NavHostController = rememberNavController()
 ) {
@@ -102,6 +105,8 @@ fun TunenagiShell(
                 ShellNavHost(
                     navController = navController,
                     motionEnabled = motionEnabled,
+                    importState = importState,
+                    onImportMusic = onImportMusic,
                     modifier = Modifier.weight(1f)
                 )
                 if (miniPlayerVisible && layout == ShellLayout.Wide) {
@@ -121,6 +126,8 @@ fun TunenagiShell(
 private fun ShellNavHost(
     navController: NavHostController,
     motionEnabled: Boolean,
+    importState: ImportUiState,
+    onImportMusic: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val durationMs = TunenagiMotion.navigationDurationMs(motionEnabled)
@@ -136,7 +143,11 @@ private fun ShellNavHost(
         popExitTransition = { fadeOut(transition) }
     ) {
         composable(TunenagiTab.Home.route) {
-            HomeScreen(onOpenSearch = { navController.switchTab(TunenagiTab.Search) })
+            HomeScreen(
+                onOpenSearch = { navController.switchTab(TunenagiTab.Search) },
+                importState = importState,
+                onImportMusic = onImportMusic
+            )
         }
         composable(TunenagiTab.Search.route) {
             SearchScreen()

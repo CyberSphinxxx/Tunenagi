@@ -30,6 +30,7 @@ class PlaybackViewModelTest {
         var disconnects = 0
         var toggles = 0
         var retries = 0
+        var played: List<List<com.tunenagi.core.model.TrackId>> = emptyList()
 
         override fun connect() {
             connects++
@@ -45,6 +46,10 @@ class PlaybackViewModelTest {
 
         override fun retry() {
             retries++
+        }
+
+        override fun playTracks(trackIds: List<com.tunenagi.core.model.TrackId>) {
+            played = played + listOf(trackIds)
         }
     }
 

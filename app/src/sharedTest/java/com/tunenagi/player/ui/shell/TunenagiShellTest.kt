@@ -2,6 +2,7 @@ package com.tunenagi.player.ui.shell
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -11,6 +12,9 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.tunenagi.core.designsystem.ShellLayout
 import com.tunenagi.core.playback.PlaybackFailure
+import com.tunenagi.player.libraryimport.ImportUiState
+import com.tunenagi.player.ui.screens.HOME_IMPORT_STATUS_TAG
+import com.tunenagi.player.ui.screens.HOME_IMPORT_TAG
 import com.tunenagi.player.ui.screens.HOME_SCREEN_TAG
 import com.tunenagi.player.ui.screens.LIBRARY_SCREEN_TAG
 import com.tunenagi.player.ui.screens.PLAYER_CLOSE_TAG
@@ -45,7 +49,9 @@ class TunenagiShellTest {
         playerState: MiniPlayerState = MiniPlayerState.None,
         layout: ShellLayout = ShellLayout.Compact,
         onTogglePlayPause: () -> Unit = {},
-        onRetryPlayback: () -> Unit = {}
+        onRetryPlayback: () -> Unit = {},
+        importState: ImportUiState = ImportUiState.Idle,
+        onImportMusic: () -> Unit = {}
     ) {
         compose.setContent {
             TunenagiTheme {
@@ -53,10 +59,42 @@ class TunenagiShellTest {
                     playerState = playerState,
                     onTogglePlayPause = onTogglePlayPause,
                     onRetryPlayback = onRetryPlayback,
+                    importState = importState,
+                    onImportMusic = onImportMusic,
                     layout = layout
                 )
             }
         }
+    }
+
+    /**
+     * The import action is real and reachable: it is the one control on Home that changes the
+     * library, and it is what makes local playback reachable at all (BUG-0004).
+     */
+    @Test
+    fun homeOffersTheImportActionAndCommandsItsHost() {
+        var imports = 0
+        setShell(onImportMusic = { imports++ })
+
+        compose.onNodeWithTag(HOME_IMPORT_TAG).assertIsDisplayed().performClick()
+
+        assertEquals(1, imports)
+    }
+
+    @Test
+    fun anImportInProgressCannotBeStartedTwiceAndSaysWhatIsHappening() {
+        setShell(importState = ImportUiState.Importing)
+
+        compose.onNodeWithTag(HOME_IMPORT_TAG).assertIsNotEnabled()
+        compose.onNodeWithTag(HOME_IMPORT_STATUS_TAG).assertIsDisplayed()
+        compose.onNodeWithText("Reading that folder…").assertIsDisplayed()
+    }
+
+    @Test
+    fun aFinishedImportReportsHowManySongsAreReady() {
+        setShell(importState = ImportUiState.Ready(3))
+
+        compose.onNodeWithText("3 songs ready to play").assertIsDisplayed()
     }
 
     @Test

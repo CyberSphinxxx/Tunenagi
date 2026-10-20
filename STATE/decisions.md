@@ -548,3 +548,45 @@ from these typed errors), TUN-0307 (the source inspector shows the format this l
 **Owner review needed?** No: the six playable containers are the formats the platform has covered
 since the project's minimum API, and the three excluded ones are excluded because none of them is
 guaranteed across that range.
+
+## ADR-016 - The app starts a queue it has already stored (2026-10-20)
+
+**Context**: the phase-02 audit found BUG-0004: `SafTreeAudioDiscovery`, `LocalLibraryIndexer` and
+`PlaybackQueueCommands.play` were implemented and tested, but nothing in the app requested a grant,
+ran a scan or started a queue. Local playback was unreachable, so the phase's outcome could not be
+demonstrated by a user even in principle. ADR-003 had said the Import action would land "with the
+tasks that give them behaviour (local playback...)", which is this phase.
+
+**Options**: (a) add a custom Media3 session command (`PLAY_TRACKS`) that the session applies to its
+own player and queue, advertising it through `onConnect`; (b) have the app persist the queue through
+the Hilt-provided `QueueRepository` and then command its `MediaController` to `setMediaItems` the same
+track ids, `prepare()` and `play()`, letting the session's existing `onAddMediaItems` resolve them;
+(c) wait for the phase-04 library UI and leave playback unreachable until then.
+
+**Decision**: (b).
+
+**Consequences**:
+- There is one order, written in one place: **persist the queue, then tell the session to play**. If
+  the second step fails, the stored queue is the authority the next command re-applies and a relaunch
+  still shows the import; the reverse order would play music that disappears at the next restart.
+- The app must inject `QueueRepository`. That is a second writer of the queue besides
+  `PlaybackQueueCommands`. It is bounded: the import is the only app-side write, it happens before
+  any controller command, and a mid-command interleaving can only leave the store ahead of the
+  player, which `reapply`/`restore` already repair by design.
+- (a) was rejected because Media3 only invokes `onCustomCommand` for commands the session advertises
+  in `onConnect`, and the handler would have to marshal player work onto the session's application
+  thread — more machinery, and a second command protocol to keep in sync, for one action.
+- (c) was rejected because it leaves a P0 phase outcome unmet and the missing piece is the import
+  entry point, not the library screen.
+- The grant is taken in the Activity (`OpenDocumentTree` + `takePersistableUriPermission`), because
+  only an Activity can; the scan and the indexing stay in `:core` behind the `LocalFolderImporter`
+  domain interface, so the app never imports `core.provider` or `core.database`.
+- MediaStore discovery remains unwired: it needs a runtime permission and a library screen to explain
+  it, which is phase 04. The user-visible path here is the folder they pick, which is the narrower
+  and more explicit consent.
+
+**Affected tasks**: TUN-0202 (the missing half), BUG-0004 (closed by it), TUN-0703 (the rest of the
+queue UI), phase 04 (MediaStore and the library surface).
+
+**Owner review needed?** No: it implements an action ADR-003 already promised for this phase, and no
+product requirement or acceptance criterion changed.

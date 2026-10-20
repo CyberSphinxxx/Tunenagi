@@ -85,10 +85,12 @@ A substitute is used for the parts that can honestly be substituted, and nothing
   that the 3-second Previous threshold matches what a listener expects when they hear it, that a
   reorder during playback does not glitch audibly, and that Media3's session routes a hardware or
   lockscreen control into the same command. Also outstanding by design: nothing in the UI can reach
-  these commands yet - the UI-facing transport (custom session commands or a controller-side facade)
-  is scheduled with the queue UI in TUN-0703, because Media3's controller surface cannot express the
-  previous-threshold or materialised-shuffle policies. Until then this is a verified session-side
-  capability, not a user-visible feature, and the phase-02 audit must read it that way.
+  a queue yet - the Import action can start one (see the next item), but Next/Previous, seek,
+  shuffle and repeat still have no UI control. The rest of the transport (custom session commands or
+  a controller-side facade) is scheduled with the queue UI in TUN-0703, because Media3's controller
+  surface cannot express the previous-threshold or materialised-shuffle policies. Until then those
+  are verified session-side capabilities, not a user-visible feature, and the phase-02 audit must
+  read them that way.
 - **Media controls (TUN-0206)**: the service declares itself as a media session/playback service,
   installs a low-importance notification channel before its session exists, routes media buttons
   through an exported `MediaButtonReceiver`, and pauses when the audio route goes noisy. Those are
@@ -116,3 +118,13 @@ A substitute is used for the parts that can honestly be substituted, and nothing
   runtime. That sentence stands: this project is explicitly **not certifiable complete** while
   this register is non-empty. What ADR-008 permits is continuing to build and to audit the
   machine-verifiable half.
+
+- **Import a folder and hear it (BUG-0004 fix)**: the chain from the Home action to a playing queue is
+  covered in pieces: `LocalFolderImportTest` reads a granted tree through a fake provider into a real
+  Room database (`6` tests), `LocalImportViewModelTest` asserts the persist-then-play order and every
+  failure state (`6` tests), and the shared `TunenagiShellTest` asserts the control, its disabled
+  state while reading and its count message. The system folder picker itself, the persistable grant,
+  a real `ContentResolver` read of a user's file, the `MediaController` round trip into
+  `onAddMediaItems`, and audible playback from the imported queue have never happened on a device.
+  Also unproven: MediaStore discovery is still not wired to any screen (phase 04 owns it), and a
+  grant the provider refuses to persist degrades to a one-session import (the scan still runs).

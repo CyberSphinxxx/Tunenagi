@@ -368,6 +368,46 @@ class PlaybackQueueCommandsTest {
         assertEquals(ids[0], currentTrackId())
     }
 
+    /**
+     * A restart restores the repeat mode the user left set, not the player's default.
+     *
+     * The mode lives in `playback_state.repeatMode`, which is the authority after process death;
+     * the player is rebuilt by the service, so applying only the items would leave Repeat All and
+     * Repeat One silently off - including for Media3's own automatic advance at the end of a track,
+     * which follows the player rather than [PlaybackQueueCommands.next].
+     */
+    @Test
+    fun restoreReappliesThePersistedRepeatModeToAFreshPlayer() = runBlocking {
+        val ids = listOf(addTrack("One"), addTrack("Two"), addTrack("Three"))
+        val firstRun = commands()
+        firstRun.play(ids)
+        firstRun.cycleRepeat()
+        assertEquals(RepeatMode.All, queue.snapshot().repeatMode)
+
+        // A new service process: a fresh player and fresh commands over the same stored queue.
+        val restartedPlayer = ExoPlayer.Builder(ApplicationProvider.getApplicationContext()).build()
+        try {
+            val restarted = PlaybackQueueCommands(
+                player = restartedPlayer,
+                queue = queue,
+                resolution = resolution,
+                clock = { at }
+            )
+
+            val restored = restarted.restore()
+
+            assertEquals(RepeatMode.All, restored?.repeatMode)
+            assertEquals(
+                "the player has to be told too, or automatic advancement ignores the setting",
+                Player.REPEAT_MODE_ALL,
+                restartedPlayer.repeatMode
+            )
+            assertFalse("a restore must not start sound", restartedPlayer.playWhenReady)
+        } finally {
+            restartedPlayer.release()
+        }
+    }
+
     // ---- failure path ----------------------------------------------------------------------------
 
     /**

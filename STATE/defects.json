@@ -39,6 +39,32 @@
       "resolution": "All three teardown paths (explicit disconnect, service disconnect, session error) now release through one private controllerRelease() that clears both the attached controller and the pending future, and is idempotent. Retest: :app:testDebugUnitTest --tests NowPlayingTest --rerun-tasks -> exit 0, 6 tests / 0 failures, including the new regression test that fails against the old code. Full gate re-run afterwards: python SCRIPTS/verify.py -> exit 0, 9/9 steps.",
       "evidence": "STATE\\evidence\\TUN-0201\\20261015T195042Z-playback-tests-after-release-fix.json",
       "closedUtc": "2026-10-15T19:59:45+00:00"
+    },
+    {
+      "id": "BUG-0004",
+      "phase": "02",
+      "relatedTask": "TUN-0202",
+      "severity": "High",
+      "status": "closed",
+      "title": "No production path imports local audio or starts a queue, so phase 02 playback is unreachable in the app",
+      "reproduction": "grep -rn 'LocalLibraryScanner|LocalAudioDiscovery|scanSummary|\\.play\\(' app/src/main core/src/main shows only class definitions and TunenagiPlaybackService.restore(); no ACTION_OPEN_DOCUMENT_TREE request, no takePersistableUriPermission, no scan trigger, and no caller of PlaybackQueueCommands.play. Home/Library remain empty states (ADR-003), so a user cannot get a single track into the player, and the service always restores an empty queue.",
+      "foundUtc": "2026-10-20T08:13:38+00:00",
+      "resolution": "Home now has a real Import music action: OpenDocumentTree takes a persistable read grant, LocalFolderImport scans the granted tree through SafTreeAudioDiscovery and LocalLibraryIndexer, returns the playable TrackIds, LocalImportViewModel persists the queue before PlaybackConnection hands the same track ids to the session via MediaController.setMediaItems/prepare/play. Covered by LocalFolderImportTest (6, real Room), LocalImportViewModelTest (6, queue-before-play order and failure states) and the shared TunenagiShellTest (import control, disabled while reading, count status); clean build with 329 JVM tests and 0 failures.",
+      "evidence": "STATE\\evidence\\TUN-0202\\20261020T083051Z-clean-build-and-all-tests-after-import-wiring-2.json",
+      "closedUtc": "2026-10-20T08:34:41+00:00"
+    },
+    {
+      "id": "BUG-0005",
+      "phase": "02",
+      "relatedTask": "TUN-0204",
+      "severity": "Medium",
+      "status": "closed",
+      "title": "Repeat mode is persisted but not re-applied on restore, so it silently resets to Off after a restart",
+      "reproduction": "Play a queue, cycleRepeat() to All, then build a fresh ExoPlayer and PlaybackQueueCommands over the same Room queue and call restore(). Before the fix the stored snapshot says All while player.repeatMode is REPEAT_MODE_OFF, so Media3's automatic end-of-track advance stops instead of looping. New test PlaybackQueueCommandsTest.restoreReappliesThePersistedRepeatModeToAFreshPlayer failed on the pre-fix tree (clean-build log: 277 tests, 1 failed) and passes after applying snapshot.repeatMode in PlaybackQueueCommands.apply.",
+      "foundUtc": "2026-10-20T08:13:38+00:00",
+      "resolution": "PlaybackQueueCommands.apply now writes snapshot.repeatMode to the player on every apply/restore, and restoreReappliesThePersistedRepeatModeToAFreshPlayer proves a second player over the same stored queue comes back with Repeat All and without autoplay.",
+      "evidence": "STATE\\evidence\\TUN-0204\\20261020T081303Z-repeat-mode-restored-after-restart.json",
+      "closedUtc": "2026-10-20T08:13:46+00:00"
     }
   ]
 }

@@ -9,6 +9,15 @@
     <string name="action_open_search">Search</string>
 
     <!-- Home -->
+    <string name="import_music">Import music</string>
+    <string name="import_reading_folder">Reading that folder…</string>
+    <plurals name="import_songs_ready">
+        <item quantity="one">%1$d song ready to play</item>
+        <item quantity="other">%1$d songs ready to play</item>
+    </plurals>
+    <string name="import_no_audio">No audio this app can play in that folder.</string>
+    <string name="import_permission_required">Access to that folder was revoked. Pick it again to restore it.</string>
+    <string name="import_failed">That folder could not be read. Try another folder.</string>
     <string name="home_empty_title">Nothing here yet</string>
     <string name="home_empty_message">Songs you play and save will show up here. Search your device and your sources to get started.</string>
 
