@@ -3,6 +3,7 @@ package com.tunenagi.core.provider.audius
 import com.tunenagi.core.model.ProviderError
 import com.tunenagi.core.model.ProviderResult
 import com.tunenagi.core.network.HttpRequest
+import com.tunenagi.core.provider.ProviderRetry
 import com.tunenagi.core.network.HttpResult
 import com.tunenagi.core.network.HttpTransport
 import java.time.Duration
@@ -39,11 +40,27 @@ class AudiusApiTest {
         }
     }
 
+    /** Answers a sequence, repeating the last result, so a retry can be observed. */
+    private class SequencedTransport(vararg results: HttpResult) : HttpTransport {
+        private val remaining = ArrayDeque(results.toList())
+        var calls = 0
+
+        override suspend fun get(request: HttpRequest): HttpResult {
+            calls++
+            return if (remaining.size > 1) remaining.removeFirst() else remaining.first()
+        }
+    }
+
+    /**
+     * The real client with a policy that does not wait, so the *decisions* are tested without the
+     * wall clock. [ProviderRetryTest] covers the real timing schedule.
+     */
     private fun api(
         transport: HttpTransport,
         key: String? = null,
-        appName: String = "tunenagi-tests"
-    ) = AudiusApi(transport = transport, appName = appName, apiKey = key)
+        appName: String = "tunenagi-tests",
+        retry: ProviderRetry = ProviderRetry(maxAttempts = 3, sleeper = { }, jitter = { 0 })
+    ) = AudiusApi(transport = transport, appName = appName, apiKey = key, retry = retry)
 
     private fun ok(body: String) = RecordingTransport(HttpResult.Response(200, body))
 
@@ -239,6 +256,30 @@ class AudiusApiTest {
         val result = api(transport).trending()
 
         assertEquals(ProviderResult.Failure(ProviderError.NetworkUnavailable), result)
+        assertEquals("the bounded policy really tried, rather than the failure being special-cased", 3, transport.calls)
+    }
+
+    @Test
+    fun aServerFaultIsRetriedOnceAndTheRetryCanSucceed() = runBlocking {
+        val transport = SequencedTransport(
+            HttpResult.Response(500, """{"error":"server"}"""),
+            HttpResult.Response(200, """{"data":[]}""")
+        )
+
+        val result = api(transport).search("slow tide")
+
+        assertTrue("expected the retry to produce an empty page, got $result", result is ProviderResult.Success)
+        assertEquals(2, transport.calls)
+    }
+
+    @Test
+    fun aPermanentRefusalCostsOneRequestNotThree() = runBlocking {
+        val transport = SequencedTransport(HttpResult.Response(403, """{"error":"gated"}"""))
+
+        val result = api(transport).search("slow tide")
+
+        assertEquals(ProviderResult.Failure(ProviderError.Restricted()), result)
+        assertEquals("403 is permanent: retrying would hammer a provider that already said no", 1, transport.calls)
     }
 
     @Test

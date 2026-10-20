@@ -1,4 +1,4 @@
-package com.tunenagi.core.provider.audius
+package com.tunenagi.core.network
 
 import com.tunenagi.core.model.PlayableReference
 import com.tunenagi.core.model.ProviderError
@@ -10,11 +10,8 @@ import com.tunenagi.core.model.Track
 import com.tunenagi.core.model.TrackId
 import com.tunenagi.core.model.TrackSource
 import com.tunenagi.core.model.TrackSourceId
-import com.tunenagi.core.network.HttpRequest
-import com.tunenagi.core.network.HttpResult
-import com.tunenagi.core.network.HttpTransport
-import com.tunenagi.core.network.HttpTransportConfig
-import com.tunenagi.core.network.OkHttpTransport
+import com.tunenagi.core.provider.audius.AudiusStreamResolver
+import com.tunenagi.core.provider.audius.STREAM_REFERENCE_LIFETIME
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
@@ -36,6 +33,10 @@ import org.junit.Test
  * query, the identifying header, the transport's refusal to follow a redirect, and its handling of
  * `Retry-After`. The one test-only concession is `allowInsecureLoopback`, which production leaves
  * false; the two tests that must exercise the production policy use a recording transport instead.
+ *
+ * It lives in the network package, not beside the adapter it exercises, because boundary rule B11
+ * forbids `core.provider.*` from importing an HTTP client: `MockWebServer` is exactly such an
+ * import, and the checker applies the rule to test sources on purpose.
  *
  * Per ADR-017 no fixture here is captured from the live service: this repository holds no Audius
  * credential, and `SPEC/PROVIDERS.md` forbids provider traffic in CI. The shapes come from the

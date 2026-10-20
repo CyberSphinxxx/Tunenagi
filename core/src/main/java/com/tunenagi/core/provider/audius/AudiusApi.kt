@@ -2,6 +2,7 @@ package com.tunenagi.core.provider.audius
 
 import com.tunenagi.core.model.ProviderError
 import com.tunenagi.core.model.ProviderResult
+import com.tunenagi.core.provider.ProviderRetry
 import com.tunenagi.core.network.HttpRequest
 import com.tunenagi.core.network.HttpResult
 import com.tunenagi.core.network.HttpTransport
@@ -31,6 +32,11 @@ import kotlinx.serialization.json.Json
  * anonymous read, the caller receives [ProviderError.Unauthorized] and the UI must say so; it must
  * never fall back to an undocumented route or a scraped source (`SPEC/PROVIDERS.md`).
  *
+ * Transient failures (`Timeout`, `NetworkUnavailable`, `Throttled`) are handed to [retry], which is
+ * bounded and honours `Retry-After`; a permanent refusal is returned on the first answer. The
+ * default is [ProviderRetry.STANDARD], and tests inject a no-wait policy so timing stays
+ * deterministic (TUN-0304).
+ *
  * Pagination is the documented offset pair, not a cursor: a full page (`items.size == limit`) means
  * there may be more, and a short or empty page means there is not. The [AudiusPage.received] count
  * is the raw row count, so one malformed row cannot stop the caller from advancing past it.
@@ -44,6 +50,8 @@ class AudiusApi(
     private val appName: String,
     private val baseUrl: String = DEFAULT_BASE_URL,
     private val apiKey: String? = null,
+    /** Bounded recovery for transient failures; see [ProviderRetry] (TUN-0304). */
+    private val retry: ProviderRetry = ProviderRetry.STANDARD,
     private val json: Json = DEFAULT_JSON
 ) {
 
@@ -61,14 +69,18 @@ class AudiusApi(
         if (query.isBlank()) {
             return ProviderResult.Failure(ProviderError.Unknown("blank-query"))
         }
-        return page(path = SEARCH_PATH, extra = listOf("query" to query), limit = limit, offset = offset)
+        return retry.run {
+            page(path = SEARCH_PATH, extra = listOf("query" to query), limit = limit, offset = offset)
+        }
     }
 
     /** The current trending list, as documented; no undocumented sort or time parameter is sent. */
     suspend fun trending(
         limit: Int = DEFAULT_PAGE_SIZE,
         offset: Int = 0
-    ): ProviderResult<AudiusPage> = page(TRENDING_PATH, extra = emptyList(), limit = limit, offset = offset)
+    ): ProviderResult<AudiusPage> = retry.run {
+        page(TRENDING_PATH, extra = emptyList(), limit = limit, offset = offset)
+    }
 
     private suspend fun page(
         path: String,

@@ -86,6 +86,13 @@ removes the trap that cost two sessions: Kotlin 2.0.20 cannot parse JDK 25, so a
 Real check runs are captured with `SCRIPTS/run_check.py`, which writes the command,
 working directory, exit code and log into `STATE/evidence/<TASK>/`.
 
+**Stage before you gate.** `check_format.py` and `check_boundaries.py` inspect the Git *index*
+(`git show :path`), not the working tree, so an untracked file is invisible to them. A new test can
+therefore pass the gate in the worktree and fail the moment it is committed. The TUN-0303
+`MockWebServer` test did exactly that (it imported OkHttp from a `core.provider.*` package, which B11
+forbids) and was moved to `core.network` in TUN-0304. Run `git add` for the files in the slice, then
+run the gates, then commit.
+
 ## Formatting and static analysis
 
 Two independent layers, both real and both runnable without a device:
