@@ -894,4 +894,4 @@ below is the original entry's content.
   agent (fresh context), not a second reviewer; the report states that limitation. MediaStore
   discovery is still not wired to a screen (phase 04 owns it).
 - **Next exact action**: claim TUN-0301 (Audius HTTP client and discovery DTOs) per
-  `PHASES/03-audius-streaming.md` and `SPEC/PROVIDERS.md`; phase 03 is now `NEXT`-eligible.
+  `PHASES/03-audius-public-online-streaming.md` and `SPEC/PROVIDERS.md`; phase 03 is now `NEXT`-eligible.
