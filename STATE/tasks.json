@@ -553,9 +553,12 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE\\evidence\\TUN-0302\\20261020T215221Z-verify-all-steps-final.json",
+        "STATE\\evidence\\TUN-0302\\20261020T215117Z-audius-normalization-tests-rerun.json"
+      ],
+      "notes": "Verified via evidence manifest 2026-10-20T21:57:24+00:00; semantic review still required."
     },
     {
       "id": "TUN-0303",
