@@ -855,3 +855,43 @@ below is the original entry's content.
   `tasks.json` shows it verified - left untouched because changing it was outside this task.
 - **Next exact action**: run the independent phase-02 audit per `PROMPTS/02_PHASE_AUDIT.md` against
   commit for TUN-0208, listing the deferred device proof; only then does phase 03 open.
+
+## 2026-10-20T08:40Z — Codebuff session (phase 02 audit + repairs)
+
+- **Phase/task**: phase 02, closing gate. All eight tasks were verified; this session ran the
+  adversarial phase audit (`STATE/audits/phase-02-20261020-0836.md`), found two real defects, fixed
+  both, and only then issued `STATE/audits/phase-02-pass.json`. Phase 02 is **audited PASS for the
+  machine-verifiable half**; phase 03 is open.
+- **Findings and repairs**:
+  - **BUG-0004 (High, closed)** — local playback was unreachable: discovery, indexing and queue
+    commands existed and were green, but no production code requested a SAF grant, ran a scan or
+    started a queue, so the app could only ever show an empty player. Home now has a real **Import
+    music** action (`OpenDocumentTree` + persistable grant in `MainActivity`), `LocalFolderImport`
+    scans and indexes the granted folder, `LocalImportViewModel` stores the queue **before**
+    `PlaybackConnection` hands the same track ids to the session. ADR-016 records the design and why
+    a custom session command was rejected.
+  - **BUG-0005 (Medium, closed)** — the stored repeat mode was never re-applied on restore, so
+    Repeat All/One silently became Off after a restart (including Media3's automatic advance).
+    `PlaybackQueueCommands.apply` now writes `snapshot.repeatMode`; a dedicated test failed before the
+    fix (277 tests, 1 failed) and passes after.
+- **Commands and exit codes (evidence paths)**:
+  - Pre-audit `verify.py` -> exit 0, 9/9, on the untouched tree.
+  - Import/VM/shell targeted run -> exit 0 (`STATE/evidence/TUN-0202/20261020T082951Z-import-folder-to-playback-tests.json`).
+  - Repeat-restore test -> exit 0 after the fix (`STATE/evidence/TUN-0204/20261020T081303Z-repeat-mode-restored-after-restart.json`).
+  - Final clean build + all JVM tests + APK -> exit 0, 94 tasks, **329 tests (283 core / 46 app), 0
+    failures** (`STATE/evidence/TUN-0202/20261020T083051Z-clean-build-and-all-tests-after-import-wiring-2.json`).
+  - Final `verify.py` -> exit 0, 9/9 green (after converting the import count to a `<plurals>`
+    resource, which Lint's `PluralsCandidate` correctly demanded).
+  - Evidence integrity sweep -> 0: 68 phase-02 manifests, every log sha256 matches; the 28 retained
+    nonzero attempts are development history and none is cited as task evidence.
+  - `check_boundaries.py --self-test` -> 0; `taskctl gate 02` -> 0; `taskctl audit 02` -> 0.
+- **Retained failures**: the first clean build inherited JDK 25 (env), the second hit the known
+  Windows lint-cache lock; both manifests are kept rather than deleted. A KSP incremental-cache
+  corruption after the package rename was fixed by deleting the caches; not a code defect.
+- **Blockers or risks**: ADR-008's device deferral is unchanged — no audible playback, no airplane
+  mode, no folder picker, no notification/lockscreen, no real `ContentResolver` read, and no
+  `MediaController` round trip has ever been observed. The audit is a self-audit by the authoring
+  agent (fresh context), not a second reviewer; the report states that limitation. MediaStore
+  discovery is still not wired to a screen (phase 04 owns it).
+- **Next exact action**: claim TUN-0301 (Audius HTTP client and discovery DTOs) per
+  `PHASES/03-audius-streaming.md` and `SPEC/PROVIDERS.md`; phase 03 is now `NEXT`-eligible.

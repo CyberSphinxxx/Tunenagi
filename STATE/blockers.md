@@ -1,7 +1,10 @@
 # Tunenagi blockers
 
-No task is currently blocked. This file records the one active blocker that was cleared, and
-keeps the resolved ones so a future session does not repeat the same dead end.
+**No P0 task is currently blocked.** Phase 02 is audited (PASS for the machine-verifiable half) and
+phase 03 is open. The device-only proof for every phase remains deferred under ADR-008 and is
+recorded in `OPERATIONS/DEFERRED_VERIFICATION.md`, not as a task blocker.
+
+The resolved entries below are kept so a future session does not repeat the same dead end.
 
 ## RESOLVED — TUN-0003 needed an Android runtime
 
