@@ -529,9 +529,12 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
-      "evidence": [],
-      "notes": ""
+      "status": "verified",
+      "evidence": [
+        "STATE/audits/phase-03-20261020-tun0301.md",
+        "STATE/evidence/TUN-0301/20261020T172948Z-verify-all-steps.json"
+      ],
+      "notes": "Audited 2026-10-20 from a fresh context after TUN-0208; machine-verifiable half PASS. Live Audius smoke and device proof are outstanding under ADR-008 and ADR-017; the audit does not claim them."
     },
     {
       "id": "TUN-0302",
