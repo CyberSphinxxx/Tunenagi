@@ -812,3 +812,40 @@ below is the original entry's content.
   surface is the player status work in TUN-0703 (recorded in the deferred register).
 - **Next exact action**: TUN-0208 — offline-first local smoke: run the local queue with the network
   unavailable, assert no network dependency in the local path and record the device-only gap.
+
+## 2026-10-20T06:32Z — Codebuff session (phase 02, TUN-0208)
+
+- **Phase/task**: Phase 02 / TUN-0208 "Offline-first local smoke" — the machine-verifiable half is
+  implemented and verified; phase 02 is now 8/8, with its independent audit pending. There is no
+  Android runtime, so actual airplane-mode audio and the screenshot remain deferred (ADR-008).
+- **Summary/change paths**:
+  - `core/src/test/java/com/tunenagi/core/playback/OfflineLocalPlaybackSmokeTest.kt` (new): a real
+    MP3-signature file, the real `LocalSourceResolver`, a real Room library, the real queue commands
+    and a Robolectric-built `TunenagiPlaybackService` around a real `ExoPlayer`, with
+    `ConnectivityManager` reporting no active network. It asserts that the local file resolves from
+    its own bytes, the queue restores silently, an explicit play reaches that file, the source stays
+    available, and a relaunch restores the queue without autoplay. A second test asserts a local
+    resolve needs no active network.
+  - No production change was needed: the offline property is structural in this phase (the local
+    path has no network dependency), and the test is the proof.
+- **Commands and exit codes (evidence paths)**:
+  - First run -> exit 1, compile error: a DAO read was outside a coroutine. Wrapped it.
+  - Second run -> exit 1, both tests failed: Robolectric's content resolver cannot open a host
+    `file://` uri, so the production reader reported StorageGone. The test now substitutes only
+    that one Android call with a disk reader and says so in the comment and the deferred register.
+  - Third run -> exit 1: `Uri.fromFile` on Windows produced `file://C%3A%5C...`, which no file
+    reader can open; the test now builds the URI with `File.toURI()`. Kept as development history,
+    not as evidence.
+  - Final targeted run -> exit 0. `run_check ... --name verify-all-steps` -> exit 0, 9/9 green
+    (`STATE/evidence/TUN-0208/20261020T062903Z-verify-all-steps.json`).
+  - Tests re-executed with `--rerun-tasks` -> exit 0, 71 tasks executed, 313 tests (276 core / 37
+    app), 0 failures (`.../20261020T063025Z-tests-really-executed.json`).
+- **Device / emulator observations**: none possible. The missing proof is explicit in
+  `OPERATIONS/DEFERRED_VERIFICATION.md`: audible playback from a real file, a MediaStore/SAF uri,
+  actual airplane mode, and the device screenshot/diagnostics. No `device-` artifact was fabricated.
+- **Blockers or risks**: phase 02's mandatory device proof remains deferred, and the phase audit
+  has not been performed. `taskctl audit 02` must not be run from this session's own claims; it
+  needs a fresh reviewer. `STATE/blockers.md` still carries a stale TUN-0003 section even though
+  `tasks.json` shows it verified - left untouched because changing it was outside this task.
+- **Next exact action**: run the independent phase-02 audit per `PROMPTS/02_PHASE_AUDIT.md` against
+  commit for TUN-0208, listing the deferred device proof; only then does phase 03 open.
