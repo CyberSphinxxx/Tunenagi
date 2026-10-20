@@ -819,7 +819,8 @@ below is the original entry's content.
   implemented and verified; phase 02 is now 8/8, with its independent audit pending. There is no
   Android runtime, so actual airplane-mode audio and the screenshot remain deferred (ADR-008).
 - **Summary/change paths**:
-  - `core/src/test/java/com/tunenagi/core/playback/OfflineLocalPlaybackSmokeTest.kt` (new): a real
+  - `core/src/test/java/com/tunenagi/core/integration/OfflineLocalPlaybackSmokeTest.kt` (new; moved
+    from `core/playback` after the boundary gate rejected the cross-layer import): a real
     MP3-signature file, the real `LocalSourceResolver`, a real Room library, the real queue commands
     and a Robolectric-built `TunenagiPlaybackService` around a real `ExoPlayer`, with
     `ConnectivityManager` reporting no active network. It asserts that the local file resolves from
@@ -840,6 +841,11 @@ below is the original entry's content.
     (`STATE/evidence/TUN-0208/20261020T062903Z-verify-all-steps.json`).
   - Tests re-executed with `--rerun-tasks` -> exit 0, 71 tasks executed, 313 tests (276 core / 37
     app), 0 failures (`.../20261020T063025Z-tests-really-executed.json`).
+  - The first `verify.py --fast` after the smoke landed -> exit 2: the boundary gate found the test
+    importing `core.provider.local` from the `core.playback` package (B3). It was moved to
+    `core.integration`, which owns no layer rule, rather than suppressing the gate. Final full
+    verify after the move -> exit 0, 9/9 (`.../20261020T063625Z-verify-final-after-boundary-move.json`),
+    and tests re-executed -> exit 0, 313 tests (`.../20261020T063754Z-tests-really-executed-after-move.json`).
 - **Device / emulator observations**: none possible. The missing proof is explicit in
   `OPERATIONS/DEFERRED_VERIFICATION.md`: audible playback from a real file, a MediaStore/SAF uri,
   actual airplane mode, and the device screenshot/diagnostics. No `device-` artifact was fabricated.

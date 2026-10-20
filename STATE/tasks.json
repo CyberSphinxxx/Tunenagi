@@ -508,9 +508,11 @@
       ],
       "status": "verified",
       "evidence": [
-        "STATE\\evidence\\TUN-0208\\20261020T062903Z-verify-all-steps.json"
+        "STATE\\evidence\\TUN-0208\\20261020T062903Z-verify-all-steps.json",
+        "STATE/evidence/TUN-0208/20261020T063625Z-verify-final-after-boundary-move.json",
+        "STATE/evidence/TUN-0208/20261020T063754Z-tests-really-executed-after-move.json"
       ],
-      "notes": "Verified via evidence manifest 2026-10-20T06:32:41+00:00; semantic review still required."
+      "notes": "Verified via evidence manifest 2026-10-20T06:32:00+00:00; semantic review still required. The test moved from core.playback to core.integration after the boundary gate rejected the cross-layer import; the final manifests above cover the moved tree."
     },
     {
       "id": "TUN-0301",

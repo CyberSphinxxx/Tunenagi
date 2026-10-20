@@ -1,63 +1,38 @@
-# Tunenagi active blockers
+# Tunenagi blockers
 
-One task is currently blocked. This file records the active blocker exactly, and keeps the
-resolved ones so a future session does not repeat the same dead end.
+No task is currently blocked. This file records the one active blocker that was cleared, and
+keeps the resolved ones so a future session does not repeat the same dead end.
 
-## ACTIVE - TUN-0003 needs an Android runtime (raised 2026-10-12T18:05Z, re-measured 2026-10-13T18:19Z)
+## RESOLVED — TUN-0003 needed an Android runtime
 
-**Task:** TUN-0003 (design tokens and navigation shell). Its `evidenceKinds` are `command` and
-`device`, and `taskctl verify` requires a non-empty artifact whose name is prefixed `device-`.
+**Resolved**: 2026-10-13T19:47Z, under ADR-008 (owner-directed build without device testing).
 
-**State of the work:** tokens, the three-tab shell, the player route, the mini-player slot and
-the empty states are implemented and green: clean build plus 25 JVM unit tests, evidence
-`STATE/evidence/TUN-0003/20261012T180122Z-clean-build-and-unit-tests.json` (BUILD SUCCESSFUL,
-exit 0, 102/102 tasks executed), and the instrumented test APK
-(`:app:assembleDebugAndroidTest`) builds. Only the on-device install, launch and UI proof is
-missing.
+### What the blocker was
 
-**Exact failure as measured on 2026-10-13T18:19Z** - method, commands and raw samples are in
-`OPERATIONS/EMULATOR_RUNTIME.md`:
+TUN-0003 (design tokens and navigation shell) carried `command,device` evidence, and
+`taskctl verify` required a non-empty `device-` artifact. The work itself was implemented and
+green, but every route to an Android runtime failed:
 
-- `adb devices` lists no device; `sc query aehd` returns 1060 (no accelerator service).
-- `emulator -avd tunenagi_api33 -accel off ...` is **accepted**: the hypervisor check passes,
-  the frontend spawns QEMU, opens ports 5554/5555 and reaches adb registration - but the guest
-  **never executes**. QEMU's cumulative CPU time stayed at 0.4375 s for a full 9-minute run and
-  showed no growth over 20-25 s samples in three further configurations (0.609375, 0.453125,
-  0.5). TCG is genuinely the selected accelerator, because QEMU printed its
-  `TCG doesn't support requested feature` lines, so this is a non-functional
-  software-emulation path rather than a missing flag.
-- `-qemu -accel tcg` and `-qemu -cpu qemu64` crash the frontend with SIGSEGV (exit 139).
-- An ARM64 system image is refused by the emulator's QEMU2 launcher on an x86_64 host, so it is
-  not an alternative here.
-- The device step itself is wired correctly, so the runtime is the only missing input: run
-  with JDK 21 and no device attached, `:app:connectedDebugAndroidTest` builds the test APK
-  (`:app:packageDebugAndroidTest` executes) and then fails only with `DeviceException: No
-  connected devices!` - exit 1, evidence `STATE/evidence/TUN-0003/20261013T190507Z-connected-android-test-preflight.json`.
+- `adb devices` listed no device; `sc query aehd` returned 1060 (no accelerator service).
+- `emulator -avd tunenagi_api33 -accel off ...` spawned QEMU and registered with adb, but the
+  guest never executed: QEMU's CPU time stayed flat for a 9-minute control run and in three other
+  configurations. `-qemu -accel tcg` and `-qemu -cpu qemu64` crashed the frontend (SIGSEGV).
+- An ARM64 image was refused by the emulator's QEMU2 launcher on this x86_64 host.
+- Two approved-elevation attempts to install the hypervisor driver were cancelled at the UAC
+  prompt; `sc query aehd` still returned 1060 afterwards.
 
-**Attempts:** 1. (2026-10-12) elevated `silent_install.bat` through the approved-elevation flow
--> the UAC prompt was cancelled, nothing ran. 2. (2026-10-13T18:19Z) the same flow with
-`silent_install_safe.bat` -> "The operation was canceled by the user. The UAC prompt may have
-been cancelled or blocked", nothing ran. 3. (2026-10-13T18:19Z) the complete software-emulation path above,
-including a 9-minute control run. Nothing was half-installed: `sc query aehd` still returns
-1060 after both elevation attempts.
+The full method, commands and raw samples are in `OPERATIONS/EMULATOR_RUNTIME.md`; the
+connected-test preflight failure is
+`STATE/evidence/TUN-0003/20261013T190507Z-connected-android-test-preflight.json`.
 
-**Required external action (any one):**
+### How it was resolved
 
-1. Run this in an elevated console - the account `CyberSphinx` is already in `Administrators`
-   and firmware AMD-V/SLAT are enabled, so nothing else needs changing:
-   `cd /d C:\Android\extras\google\Android_Emulator_Hypervisor_Driver && silent_install_safe.bat`
-2. Or approve the UAC prompt if the sandbox elevation flow shows one - it runs the same
-   installer.
-3. Or attach a physical Android device with USB debugging enabled (API 26+).
-
-**Safe fallback actually taken instead of faking it:** an unaccelerated JVM or a mock-only
-substitute is not valid evidence for a `device` kind, so the task stays `blocked`, no device
-artifact is fabricated, and the device-independent phase-00 work was completed instead
-(TUN-0004, TUN-0005).
-
-**Next eligible task while this is blocked:** none inside phase 00. TUN-0004 and TUN-0005 are
-verified, TUN-0006 depends on TUN-0003, and every later phase is gated behind the phase-00
-audit, which requires all six phase-00 tasks verified.
+The owner directed that the build continue without a device (ADR-008). `evidenceKinds` was
+reduced to `command` for TUN-0003 and the other device tasks, and the missing device proof was
+moved to `OPERATIONS/DEFERRED_VERIFICATION.md` rather than fabricated or silently dropped. TUN-0003
+was then verified against its command evidence and the phase-00 audit passed. The underlying
+on-device launch proof is still outstanding and is listed in that register; this resolution is a
+deferral, not a waiver.
 
 ## RESOLVED — TUN-0002 blocked on build runtime JDK
 
