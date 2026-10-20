@@ -755,3 +755,60 @@ below is the original entry's content.
 - **Next exact action**: TUN-0207 — buffering/error/retry state with timeout, cancellation, missing
   track and codec failures, bounded retry and concurrency tests; also the surface that shows the
   service's held `restoreFailure`.
+
+## 2026-10-20T06:20Z — Codebuff session (phase 02, TUN-0207)
+
+- **Phase/task**: Phase 02 / TUN-0207 "Buffering/error/retry state" — claimed, implemented and
+  verified (`taskctl verify`), phase 02 now 7/8. The remaining phase-02 task is TUN-0208.
+- **Summary/change paths**:
+  - `core/.../playback/PlaybackRecovery.kt` (new): the typed `PlaybackFailure` taxonomy
+    (timeout, network, missing source, access lost, unsupported/damaged format, unknown), the
+    `PlaybackStatus` states (idle, buffering, ready, failed with attempts and whether a retry is
+    scheduled), `PlaybackRecovery` listening to the real player, and a `HandlerRetryScheduler`
+    pinned to the main looper. Two automatic attempts at 1s/2s for transient failures only; every
+    error, transition, `READY` and `cancel()` moves a generation counter so a timer that was
+    already dispatched cannot prepare a different track.
+  - `core/.../playback/TunenagiPlaybackService.kt`: attaches one recovery loop to its own player,
+    before the start-up restore, and detaches/cancels it before releasing the player.
+  - `app/.../playback/NowPlaying.kt`, `NowPlayingSource.kt`, `PlaybackConnection.kt`,
+    `PlaybackViewModel.kt`, `ui/playback/PlaybackUi.kt`: the snapshot now carries `isBuffering`
+    and the typed `failure` read from `Player.playbackState` / `Player.playerError`; `retry()`
+    reaches `MediaController.prepare()`, which preserves `playWhenReady` and therefore cannot turn
+    a retry after a deliberate pause into autoplay.
+  - `app/.../ui/shell/MiniPlayer.kt`, `TunenagiShell.kt`, `MainActivity.kt`, `strings.xml`: the bar
+    replaces the artist line with the failure sentence (or "Buffering…") and shows an accessible
+    Retry control only when there is a failure. Messages are per failure kind and exhaustive.
+  - Tests: `PlaybackRecoveryTest` (10) covers the taxonomy, the two-attempt bound and backoff, no
+    retry for permanent failures, the transition/cancel race, a double-error burst, READY resetting
+    the budget, buffering not masking a failure, eight-thread concurrency, and the real handler
+    scheduler's delay/cancel. `TunenagiPlaybackServiceTest` adds the service-owned recovery
+    lifetime; `NowPlayingTest` (3), `PlaybackViewModelTest` (1) and `TunenagiShellTest` (2) cover
+    the mapping and the bar.
+- **Commands and exit codes (evidence paths)**:
+  - First full unit run via `run_check` -> exit 1: one new test asserted a pending timer after a
+    burst that had just exhausted the budget; the expectation was wrong (the exhausted path
+    correctly cancels the timer), not the production code. Fixed the assertion to assert
+    exhaustion and no timer (`STATE/evidence/TUN-0207/20261020T060637Z-unit-tests-first-run.json`).
+  - First `verify.py` -> exit 2, 8/9: lint's `SwitchIntDef` required an explicit
+    `Player.STATE_ENDED` branch. Added it (a real state, handled as idle) rather than suppressing
+    the check (`.../20261020T061101Z-verify-all-steps.json`).
+  - Final `python SCRIPTS/run_check.py --task TUN-0207 --name verify-all-steps-2 -- python
+    SCRIPTS/verify.py` -> exit 0, 9/9 green (`.../20261020T061410Z-verify-all-steps-2.json`).
+  - Tests re-executed on the final tree with `--rerun-tasks` -> exit 0, 71 tasks executed, 311
+    tests (274 core / 37 app), 0 failures (`.../20261020T061630Z-tests-really-executed.json`).
+- **Audit of this slice**: the recovery suite was mutation-checked by changing the bound from
+  `< maxAutomaticRetries` to `<= maxAutomaticRetries`: `PlaybackRecoveryTest` failed (BUILD FAILED,
+  exit 1), the bound was restored, and the same class passed again (exit 0). The concurrency test
+  also failed for real during development, proving it observes the budget rather than merely
+  compiling. The mutation run is not an evidence manifest (it was a direct Gradle invocation), so
+  it is recorded here rather than claimed as command evidence.
+- **Device / emulator observations**: none possible (no device, no emulator). The substitute is the
+  production recovery class, a real `ExoPlayer` on the Robolectric-built service and the real main
+  looper. It proves classification, bounds, cancellation and the UI state, but not a real decoder
+  rejection, a corrupt FLAC, a live timeout recovering audibly, or the error appearing on a
+  notification/lockscreen. Recorded in `OPERATIONS/DEFERRED_VERIFICATION.md`.
+- **Blockers or risks**: the standing device deferral. The service's held `restoreFailure` is still
+  not surfaced to any screen; it is a restore-time failure rather than a player error, and its
+  surface is the player status work in TUN-0703 (recorded in the deferred register).
+- **Next exact action**: TUN-0208 — offline-first local smoke: run the local queue with the network
+  unavailable, assert no network dependency in the local path and record the device-only gap.

@@ -33,4 +33,15 @@
          describe the action the control performs, not the current state. -->
     <string name="mini_player_play">Play</string>
     <string name="mini_player_pause">Pause</string>
+
+    <!-- Playback problems. Each message says what happened in terms a listener can act on; the
+         Retry control is the accessible name of the retry action. -->
+    <string name="playback_buffering">Buffering…</string>
+    <string name="playback_retry">Retry</string>
+    <string name="playback_error_timeout">Playback timed out. Try again.</string>
+    <string name="playback_error_network">Can\'t reach the source. Check your connection.</string>
+    <string name="playback_error_missing">This track is no longer on this device.</string>
+    <string name="playback_error_permission">Access to this track was revoked.</string>
+    <string name="playback_error_unsupported">This device can\'t play this file.</string>
+    <string name="playback_error_unknown">Playback stopped unexpectedly.</string>
 </resources>

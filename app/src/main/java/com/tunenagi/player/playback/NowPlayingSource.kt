@@ -45,4 +45,12 @@ interface NowPlayingSource {
 
     /** Starts playback when paused, pauses when playing. A no-op with nothing loaded. */
     fun togglePlayPause()
+
+    /**
+     * Retries the item playback stopped on. A no-op with nothing attached.
+     *
+     * The session has already spent its automatic attempts by the time a failure is shown; this is
+     * the user's own retry, so it is not counted against that budget and does not wait.
+     */
+    fun retry()
 }

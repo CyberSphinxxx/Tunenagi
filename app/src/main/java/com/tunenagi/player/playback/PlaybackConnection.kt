@@ -165,4 +165,12 @@ class PlaybackConnection @Inject constructor(
         // caller sees the unchanged state through `nowPlaying` rather than a silent lie.
         if (attached.isPlaying) attached.pause() else attached.play()
     }
+
+    override fun retry() {
+        val attached = controller ?: return
+        // Media3 keeps `playWhenReady` across a playback error, so `prepare()` re-opens the item
+        // and resumes only when the user had asked for sound. Calling `play()` here would turn a
+        // manual retry after a deliberate pause into an autoplay surprise.
+        attached.prepare()
+    }
 }

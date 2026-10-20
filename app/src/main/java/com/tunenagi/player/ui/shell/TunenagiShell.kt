@@ -59,6 +59,7 @@ fun TunenagiShell(
     modifier: Modifier = Modifier,
     playerState: MiniPlayerState = MiniPlayerState.None,
     onTogglePlayPause: () -> Unit = {},
+    onRetryPlayback: () -> Unit = {},
     layout: ShellLayout = TunenagiWindowSize.layoutFor(LocalConfiguration.current.screenWidthDp),
     navController: NavHostController = rememberNavController()
 ) {
@@ -85,7 +86,8 @@ fun TunenagiShell(
                     MiniPlayerHost(
                         state = playerState,
                         onExpand = openPlayer,
-                        onTogglePlayPause = onTogglePlayPause
+                        onTogglePlayPause = onTogglePlayPause,
+                        onRetry = onRetryPlayback
                     )
                     TunenagiNavigationBar(navController)
                 }
@@ -106,7 +108,8 @@ fun TunenagiShell(
                     MiniPlayerHost(
                         state = playerState,
                         onExpand = openPlayer,
-                        onTogglePlayPause = onTogglePlayPause
+                        onTogglePlayPause = onTogglePlayPause,
+                        onRetry = onRetryPlayback
                     )
                 }
             }

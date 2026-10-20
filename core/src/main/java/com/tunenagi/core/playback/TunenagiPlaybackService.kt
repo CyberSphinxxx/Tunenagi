@@ -99,6 +99,17 @@ open class TunenagiPlaybackService : MediaLibraryService() {
         private set
 
     /**
+     * The bounded error-recovery loop over the service's player (TUN-0207), or `null` when the
+     * service is not running.
+     *
+     * Owned here rather than by the UI so every failure the player raises - from a lockscreen
+     * command, a resumption or the app - gets the same policy. It is detached and cancelled in
+     * [onDestroy], because a retry that outlived its player would prepare nothing.
+     */
+    internal var playbackRecovery: PlaybackRecovery? = null
+        private set
+
+    /**
      * Why the start-up restore did not happen, when it did not.
      *
      * A restore can fail for a reason a user can act on - a file deleted since the last session, a
@@ -130,6 +141,16 @@ open class TunenagiPlaybackService : MediaLibraryService() {
         setMediaNotificationProvider(TunenagiNotifications.provider(this))
         val playbackEngine = TunenagiPlaybackEngine(this)
         engine = playbackEngine
+        // A failure is retried at most twice, on the main thread, through the player this service
+        // owns. `prepare()` is the whole retry: it re-opens the failed item rather than inventing
+        // a replacement source, and it resumes only if `playWhenReady` still reflects the user's
+        // intent.
+        val recovery = PlaybackRecovery(
+            retry = { playbackEngine.player.prepare() },
+            scheduler = HandlerRetryScheduler()
+        )
+        playbackEngine.player.addListener(recovery)
+        playbackRecovery = recovery
         val graph = PlaybackResolution.current()
         queueCommands = graph.queue?.let { queue ->
             PlaybackQueueCommands(
@@ -208,6 +229,11 @@ open class TunenagiPlaybackService : MediaLibraryService() {
         // Detach before the engine goes: a listener left on a released player would be called for
         // events that no longer describe anything, and its ticker would write positions for a queue
         // this service no longer owns.
+        playbackRecovery?.let { recovery ->
+            engine?.player?.removeListener(recovery)
+            recovery.cancel()
+        }
+        playbackRecovery = null
         progressRecorder?.stop()
         progressRecorder = null
         library?.release()

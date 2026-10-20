@@ -16,7 +16,8 @@ import com.tunenagi.player.ui.shell.MiniPlayerState
  */
 class PlaybackUi(
     val state: MiniPlayerState,
-    val onTogglePlayPause: () -> Unit
+    val onTogglePlayPause: () -> Unit,
+    val onRetry: () -> Unit
 )
 
 /** Attaches the host to the playback view model and observes its state for as long as it is shown. */
@@ -26,5 +27,9 @@ fun rememberPlaybackUi(): PlaybackUi {
     val state by viewModel.miniPlayerState.collectAsStateWithLifecycle(
         initialValue = MiniPlayerState.None
     )
-    return PlaybackUi(state = state, onTogglePlayPause = viewModel::togglePlayPause)
+    return PlaybackUi(
+        state = state,
+        onTogglePlayPause = viewModel::togglePlayPause,
+        onRetry = viewModel::retry
+    )
 }

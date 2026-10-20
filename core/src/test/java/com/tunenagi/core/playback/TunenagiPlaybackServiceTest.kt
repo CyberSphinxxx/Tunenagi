@@ -178,6 +178,24 @@ class TunenagiPlaybackServiceTest {
         assertTrue(engine.isReleased)
     }
 
+    /**
+     * TUN-0207's session half: the service owns one recovery loop, it starts idle, and it is
+     * dropped with the player it would otherwise prepare.
+     */
+    @Test
+    fun theServiceOwnsOneRecoveryLoopAndStopsItWithThePlayer() {
+        val service = startedService()
+        try {
+            val recovery = service.playbackRecovery
+            assertNotNull("a running service must watch its player for failures", recovery)
+            assertEquals(PlaybackStatus.Idle, recovery!!.status.value)
+        } finally {
+            service.onDestroy()
+        }
+
+        assertNull("a retry must not outlive the service's player", service.playbackRecovery)
+    }
+
     @Test
     fun recreatingTheServiceBuildsAFreshPlayerRatherThanReusingAReleasedOne() {
         val first = startedService()

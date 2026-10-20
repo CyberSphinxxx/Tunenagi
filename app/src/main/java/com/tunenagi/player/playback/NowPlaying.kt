@@ -1,6 +1,8 @@
 package com.tunenagi.player.playback
 
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import com.tunenagi.core.playback.PlaybackFailure
 import com.tunenagi.player.ui.shell.MiniPlayerState
 
 /**
@@ -16,7 +18,11 @@ data class NowPlaying(
     val mediaId: String,
     val title: String,
     val artist: String?,
-    val isPlaying: Boolean
+    val isPlaying: Boolean,
+    /** The player is waiting for data; the control stays enabled but the bar says so. */
+    val isBuffering: Boolean = false,
+    /** Why playback stopped, when it did. Read from the player, never from an intention. */
+    val failure: PlaybackFailure? = null
 )
 
 /**
@@ -35,13 +41,28 @@ fun Player.nowPlayingOrNull(): NowPlaying? {
         mediaId = item.mediaId,
         title = metadata.title?.toString()?.takeIf { it.isNotBlank() } ?: item.mediaId,
         artist = metadata.artist?.toString()?.takeIf { it.isNotBlank() },
-        isPlaying = isPlaying
+        isPlaying = isPlaying,
+        isBuffering = playbackState == Player.STATE_BUFFERING,
+        failure = playerError?.let { PlaybackFailure.from(it) }
     )
 }
+
+/**
+ * The typed failure the player is currently stopped on, or `null`.
+ *
+ * Extracted from [nowPlayingOrNull] so the classification can be tested with a constructed
+ * exception: a real player cannot be asked to fail on demand in a JVM test, and fabricating a
+ * `NowPlaying` snapshot would test nothing. The player error itself is read from Media3, and this
+ * only translates it.
+ */
+fun PlaybackException?.toPlaybackFailure(): PlaybackFailure? =
+    this?.let { PlaybackFailure.from(it) }
 
 /** Renders the snapshot in the shell's mini-player slot. */
 fun NowPlaying.toMiniPlayerState(): MiniPlayerState = MiniPlayerState.Track(
     title = title,
     artist = artist.orEmpty(),
-    isPlaying = isPlaying
+    isPlaying = isPlaying,
+    isBuffering = isBuffering,
+    failure = failure
 )

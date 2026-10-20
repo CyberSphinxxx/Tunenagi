@@ -6,9 +6,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.tunenagi.core.designsystem.ShellLayout
+import com.tunenagi.core.playback.PlaybackFailure
 import com.tunenagi.player.ui.screens.HOME_SCREEN_TAG
 import com.tunenagi.player.ui.screens.LIBRARY_SCREEN_TAG
 import com.tunenagi.player.ui.screens.PLAYER_CLOSE_TAG
@@ -42,13 +44,15 @@ class TunenagiShellTest {
     private fun setShell(
         playerState: MiniPlayerState = MiniPlayerState.None,
         layout: ShellLayout = ShellLayout.Compact,
-        onTogglePlayPause: () -> Unit = {}
+        onTogglePlayPause: () -> Unit = {},
+        onRetryPlayback: () -> Unit = {}
     ) {
         compose.setContent {
             TunenagiTheme {
                 TunenagiShell(
                     playerState = playerState,
                     onTogglePlayPause = onTogglePlayPause,
+                    onRetryPlayback = onRetryPlayback,
                     layout = layout
                 )
             }
@@ -163,6 +167,44 @@ class TunenagiShellTest {
 
         compose.onNodeWithContentDescription("Play").assertIsDisplayed()
         compose.onNodeWithContentDescription("Pause").assertDoesNotExist()
+    }
+
+    /**
+     * TUN-0207's user-facing half: a stopped track explains itself and offers the manual retry
+     * after the session's automatic attempts are spent.
+     */
+    @Test
+    fun aFailedTrackShowsTheReasonAndARetryControl() {
+        var retries = 0
+        setShell(
+            playerState = MiniPlayerState.Track(
+                title = "Slow Tide",
+                artist = "Kaori Ito",
+                failure = PlaybackFailure.MissingSource
+            ),
+            onRetryPlayback = { retries++ }
+        )
+
+        compose.onNodeWithText("This track is no longer on this device.").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Retry").assertIsDisplayed()
+
+        compose.onNodeWithTag(MINI_PLAYER_RETRY_TAG).performClick()
+
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun aBufferingTrackSaysSoAndDoesNotOfferARetry() {
+        setShell(
+            playerState = MiniPlayerState.Track(
+                title = "Slow Tide",
+                artist = "Kaori Ito",
+                isBuffering = true
+            )
+        )
+
+        compose.onNodeWithText("Buffering…").assertIsDisplayed()
+        compose.onNodeWithTag(MINI_PLAYER_RETRY_TAG).assertDoesNotExist()
     }
 
     @Test

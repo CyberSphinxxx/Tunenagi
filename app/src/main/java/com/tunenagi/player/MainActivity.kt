@@ -50,7 +50,8 @@ class MainActivity : ComponentActivity() {
                     val playback = rememberPlaybackUi()
                     TunenagiShell(
                         playerState = playback.state,
-                        onTogglePlayPause = playback.onTogglePlayPause
+                        onTogglePlayPause = playback.onTogglePlayPause,
+                        onRetryPlayback = playback.onRetry
                     )
                 }
             }
