@@ -28,6 +28,15 @@ class TunenagiPlaybackEngine(context: Context) {
                 .build(),
             TunenagiPlayback.HANDLE_AUDIO_FOCUS
         )
+        // Headphones unplugged, Bluetooth lost, or the route otherwise became noisy: pause. This is
+        // ExoPlayer's own default, stated here so the policy is a decision in the code rather than an
+        // inherited accident - and, importantly, it is pause, not stop-and-forget: reconnecting does
+        // not resume by itself, so the next sound is always something the user asked for.
+        .setHandleAudioBecomingNoisy(true)
+        // A partial wake lock while a queue is playing, so a screen-off device keeps decoding local
+        // audio. Local rather than network: this slice plays only files on the device, and a wifi
+        // lock would be a permission held for no reason. Released with the player in `release()`.
+        .setWakeMode(C.WAKE_MODE_LOCAL)
         .build()
 
     /** The player itself. Never handed to the UI; the app talks to the session instead. */

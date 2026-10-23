@@ -3,8 +3,10 @@ package com.tunenagi.player.playback
 import android.content.Context
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
+import com.tunenagi.core.playback.PlaybackFailure
 import com.tunenagi.player.ui.shell.MiniPlayerState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -89,6 +91,40 @@ class NowPlayingTest {
         }
     }
 
+    @Test
+    fun aPlayersErrorIsTranslatedIntoTheTypedFailureTheBarShows() {
+        assertNull("a player with no error must expose none", null.toPlaybackFailure())
+
+        val missing = PlaybackException(
+            "fixture is gone",
+            null,
+            PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND
+        ).toPlaybackFailure()
+        assertEquals(PlaybackFailure.MissingSource, missing)
+
+        val codec = PlaybackException(
+            "unsupported",
+            null,
+            PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED
+        ).toPlaybackFailure()
+        assertEquals(PlaybackFailure.UnsupportedFormat, codec)
+    }
+
+    @Test
+    fun bufferingAndFailureSurviveTheMappingToTheMiniPlayer() {
+        val state = NowPlaying(
+            mediaId = "local:7",
+            title = "Slow Tide",
+            artist = "Kaori Ito",
+            isPlaying = false,
+            isBuffering = true,
+            failure = PlaybackFailure.Timeout
+        ).toMiniPlayerState() as MiniPlayerState.Track
+
+        assertTrue(state.isBuffering)
+        assertEquals(PlaybackFailure.Timeout, state.failure)
+    }
+
     /**
      * The connection's own state machine, which is the part of playback the UI is allowed to see.
      *
@@ -146,6 +182,16 @@ class NowPlayingTest {
         val source = PlaybackConnection(context)
 
         source.togglePlayPause()
+
+        assertEquals(NowPlayingSource.Connection.Closed, source.connection.value)
+        assertNull(source.nowPlaying.value)
+    }
+
+    @Test
+    fun retryingWithNothingAttachedIsAHarmlessNoOp() {
+        val source = PlaybackConnection(context)
+
+        source.retry()
 
         assertEquals(NowPlayingSource.Connection.Closed, source.connection.value)
         assertNull(source.nowPlaying.value)

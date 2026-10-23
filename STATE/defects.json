@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "id": "BUG-0001",
+      "phase": "00",
+      "relatedTask": "TUN-0003",
+      "severity": "Medium",
+      "status": "closed",
+      "title": "Compact shell mounts the mini-player twice",
+      "reproduction": "app/src/main/java/com/tunenagi/player/ui/shell/TunenagiShell.kt passed MiniPlayerHost both to Scaffold(bottomBar=...) and to the content Column. In ShellLayout.Compact with MiniPlayerState.Track both were composed: the bottom bar reserved the bar's height twice and the semantics tree held two nodes with TestTag 'mini-player' (measured: node #172 at t=218..304px and node #123 at t=304..390px). Found by TunenagiShellTest on the JVM (Robolectric): 'Failed to perform checkIsDisplayed check: Expected at most 1 node but found 2 nodes that satisfy (TestTag = mini-player)'. SPEC/UX_DESIGN.md requires the mini-player to sit above the navigation bar, i.e. exactly once.",
+      "foundUtc": "2026-10-13T19:43:25+00:00",
+      "resolution": "Fixed in TunenagiShell.kt: the layout now mounts exactly one MiniPlayerHost per layout (compact: inside the bottom-bar Column above the navigation bar; wide: closing the content column), with the decision hoisted into miniPlayerVisible/layout so the two call sites cannot disagree again. Retest: :app:testDebugUnitTest --rerun-tasks rebuilt and ran the shell suite on the JVM, exit 0, 8 tests / 0 failures, including two new regression tests asserting exactly one 'mini-player' and one navigation container node in each layout.",
+      "evidence": "STATE\\evidence\\TUN-0003\\20261013T194215Z-jvm-android-ui-suite.json",
+      "closedUtc": "2026-10-13T19:43:29+00:00"
+    },
+    {
+      "id": "BUG-0002",
+      "phase": "01",
+      "relatedTask": "TUN-0102",
+      "severity": "Low",
+      "status": "closed",
+      "title": "Source loss is not covered by a deletes-a-source test",
+      "reproduction": "SPEC/DATA_MODEL.md: 'source can disappear without deleting Track/PlaylistEntry'. The phase-01 trap list names 'accidental deletion after source loss'. Phase 01 asserts the opposite direction (DatabaseConstraintTest.deletingATrackCascadesItsDependentsAndKeepsTheAlbum) and asserts that an unavailable source stays in the library (SourceMatchRepositoryTest.anAvailabilityChangeOnTheLockedSourceDoesNotUnlockIt, MigrationTest seeds a Restricted source), but no test deletes a track_sources row and checks that the track, its credit and its playlist entry survive. Found by the phase-01 audit while checking each named trap.",
+      "foundUtc": "2026-10-13T20:33:01+00:00",
+      "resolution": "Added DatabaseConstraintTest.deletingASourceLeavesTheTrackCreditsAndPlaylistsIntact: it removes the track_sources row outright and asserts the track, its credit row, its playlist entry and its favourite all survive, and that the track's source count drops to zero. Retest: the :core::database suite ran green (exit 0) with the new test included.",
+      "evidence": "STATE\\evidence\\TUN-0102\\20261013T203306Z-source-loss-regression.json",
+      "closedUtc": "2026-10-13T20:34:22+00:00"
+    },
+    {
+      "id": "BUG-0003",
+      "phase": "02",
+      "relatedTask": "TUN-0201",
+      "severity": "Medium",
+      "status": "closed",
+      "title": "A disconnect while the controller was still binding left the app permanently Closed",
+      "reproduction": "PlaybackConnection.disconnect() released through controller?.let { ... }, so while a MediaController was still binding (controller == null, controllerFuture != null) it released nothing: controllerFuture survived, and every later connect() returned early on if (controllerFuture != null). The connection then stayed Closed for the rest of the process with the service binding still held, and only an app restart could recover. onError() had the same shape: it reported Failed and left an attached controller in place. Found while writing the teardown test; proved by mutation - reverting disconnect() to the guarded form makes NowPlayingTest.disconnectingWhileConnectingLetsTheNextConnectTryAgain fail with expected:<Connecting> but was:<Closed> (STATE/evidence/TUN-0201/20261015T194929Z-old-disconnect-mutation-fails.json, exit 1).",
+      "foundUtc": "2026-10-15T19:59:45+00:00",
+      "resolution": "All three teardown paths (explicit disconnect, service disconnect, session error) now release through one private controllerRelease() that clears both the attached controller and the pending future, and is idempotent. Retest: :app:testDebugUnitTest --tests NowPlayingTest --rerun-tasks -> exit 0, 6 tests / 0 failures, including the new regression test that fails against the old code. Full gate re-run afterwards: python SCRIPTS/verify.py -> exit 0, 9/9 steps.",
+      "evidence": "STATE\\evidence\\TUN-0201\\20261015T195042Z-playback-tests-after-release-fix.json",
+      "closedUtc": "2026-10-15T19:59:45+00:00"
+    },
+    {
+      "id": "BUG-0004",
+      "phase": "02",
+      "relatedTask": "TUN-0202",
+      "severity": "High",
+      "status": "closed",
+      "title": "No production path imports local audio or starts a queue, so phase 02 playback is unreachable in the app",
+      "reproduction": "grep -rn 'LocalLibraryScanner|LocalAudioDiscovery|scanSummary|\\.play\\(' app/src/main core/src/main shows only class definitions and TunenagiPlaybackService.restore(); no ACTION_OPEN_DOCUMENT_TREE request, no takePersistableUriPermission, no scan trigger, and no caller of PlaybackQueueCommands.play. Home/Library remain empty states (ADR-003), so a user cannot get a single track into the player, and the service always restores an empty queue.",
+      "foundUtc": "2026-10-20T08:13:38+00:00",
+      "resolution": "Home now has a real Import music action: OpenDocumentTree takes a persistable read grant, LocalFolderImport scans the granted tree through SafTreeAudioDiscovery and LocalLibraryIndexer, returns the playable TrackIds, LocalImportViewModel persists the queue before PlaybackConnection hands the same track ids to the session via MediaController.setMediaItems/prepare/play. Covered by LocalFolderImportTest (6, real Room), LocalImportViewModelTest (6, queue-before-play order and failure states) and the shared TunenagiShellTest (import control, disabled while reading, count status); clean build with 329 JVM tests and 0 failures.",
+      "evidence": "STATE\\evidence\\TUN-0202\\20261020T083051Z-clean-build-and-all-tests-after-import-wiring-2.json",
+      "closedUtc": "2026-10-20T08:34:41+00:00"
+    },
+    {
+      "id": "BUG-0005",
+      "phase": "02",
+      "relatedTask": "TUN-0204",
+      "severity": "Medium",
+      "status": "closed",
+      "title": "Repeat mode is persisted but not re-applied on restore, so it silently resets to Off after a restart",
+      "reproduction": "Play a queue, cycleRepeat() to All, then build a fresh ExoPlayer and PlaybackQueueCommands over the same Room queue and call restore(). Before the fix the stored snapshot says All while player.repeatMode is REPEAT_MODE_OFF, so Media3's automatic end-of-track advance stops instead of looping. New test PlaybackQueueCommandsTest.restoreReappliesThePersistedRepeatModeToAFreshPlayer failed on the pre-fix tree (clean-build log: 277 tests, 1 failed) and passes after applying snapshot.repeatMode in PlaybackQueueCommands.apply.",
+      "foundUtc": "2026-10-20T08:13:38+00:00",
+      "resolution": "PlaybackQueueCommands.apply now writes snapshot.repeatMode to the player on every apply/restore, and restoreReappliesThePersistedRepeatModeToAFreshPlayer proves a second player over the same stored queue comes back with Repeat All and without autoplay.",
+      "evidence": "STATE\\evidence\\TUN-0204\\20261020T081303Z-repeat-mode-restored-after-restart.json",
+      "closedUtc": "2026-10-20T08:13:46+00:00"
+    },
+    {
+      "id": "BUG-0006",
+      "phase": "03",
+      "relatedTask": "TUN-0302",
+      "severity": "Medium",
+      "status": "open",
+      "title": "Gated-but-streamable rows appear playable until resolve answers 401",
+      "reproduction": "Unit-level: the discovery DTO has no gating field, so AudiusNormalization maps a row with is_streamable=true to SourceAvailability.Available unconditionally; ADR-018 records that a track with access_authorities answers 401 to the unsigned stream request. Consequence: the discovery row and the source inspector both say Ready to play and the refusal only appears when the user taps the track. No bypass happens (the typed Unauthorized failure is honest and no substitute source is tried); the gap is that the unplayable state is shown late rather than up front, which SPEC/PROVIDERS.md asks to show as an unplayable state.",
+      "foundUtc": "2026-10-23T08:56:09+00:00",
+      "resolution": null,
+      "evidence": null
+    }
+  ]
+}

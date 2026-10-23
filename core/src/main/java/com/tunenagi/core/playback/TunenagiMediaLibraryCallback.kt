@@ -11,8 +11,15 @@ import androidx.media3.session.SessionError
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 import com.tunenagi.core.model.ProviderError
 import com.tunenagi.core.model.SourceAvailability
+import java.util.concurrent.ExecutionException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * How the session turns the media items a controller asks for into items the player can play —
@@ -114,7 +121,17 @@ class UnresolvedMediaItemException(
  * root whose children are invented would be a lie in the one place a system UI displays it.
  */
 class TunenagiMediaLibraryCallback(
-    private val resolution: MediaItemResolution = MediaItemResolution.LocalUriOnly
+    private val resolution: MediaItemResolution = MediaItemResolution.LocalUriOnly,
+    /**
+     * Where the queue the platform may resume lives, or `null` when the host installed no library.
+     *
+     * Optional so the callback remains usable (and testable) without a database, and read lazily by
+     * [onPlaybackResumption] rather than captured per command: the queue it answers with must be the
+     * one stored when the system asks, not the one that existed when the service was built.
+     */
+    private val queue: QueueRepository? = null,
+    /** The scope the resumption read runs on; the service passes the scope it cancels with itself. */
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 ) : MediaLibraryService.MediaLibrarySession.Callback {
 
     // The two-argument `LibraryResult.ofError` overloads that echo the caller's params are Media3's
@@ -172,6 +189,66 @@ class TunenagiMediaLibraryCallback(
         controller: MediaSession.ControllerInfo,
         mediaItems: List<MediaItem>
     ): ListenableFuture<List<MediaItem>> = resolution.resolve(mediaItems)
+
+    /**
+     * Answers the platform's "resume what this user was listening to" request — TUN-0206.
+     *
+     * This is the *only* path allowed to start sound without the user touching the app in this
+     * slice, and it is the distinction `SPEC/DATA_MODEL.md` draws: the OS creating the service (or
+     * the app being opened) is not a resumption request, while a media button, a Bluetooth AVRCP
+     * play, or the system's media resumption card is. Media3 calls this only for those, hands the
+     * returned items to the player and starts playback, so this method answers with the stored
+     * queue - it does not touch the player itself, which would make two writers race for the same
+     * queue.
+     *
+     * A user who never resumed sees nothing: an empty store resolves to `null`, which Media3 treats
+     * as "nothing to resume" rather than as a failure. An untrusted controller is refused outright,
+     * because answering would let any installed app start audio.
+     */
+    @OptIn(UnstableApi::class)
+    override fun onPlaybackResumption(
+        session: MediaSession,
+        controller: MediaSession.ControllerInfo
+    ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+        if (!controller.isTrusted) {
+            return Futures.immediateFailedFuture(
+                SecurityException("resumption is only answered for a trusted controller")
+            )
+        }
+        val repository = queue ?: return Futures.immediateFuture(null)
+        val result = SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
+        scope.launch {
+            try {
+                val snapshot = repository.snapshot()
+                if (snapshot.queue.isEmpty()) {
+                    // Only reached on a first launch: there is nothing to resume, and Media3 needs
+                    // to hear that as an answer, not as an error the system UI would surface.
+                    result.set(null)
+                    return@launch
+                }
+                // The stored pointer can name an item a queue edit removed while the app was not
+                // running. Starting the queue from its first item is the same rule TUN-0205's
+                // restore applies, and for the same reason: a position belongs to one item.
+                val index = snapshot.queue.indexOfFirst { it.id == snapshot.currentItemId }
+                val startIndex = index.coerceAtLeast(0)
+                val startPositionMs = if (index >= 0) snapshot.progressMs.coerceAtLeast(0) else 0L
+                // Resolve late, off the caller's thread: a file can have moved since the queue was
+                // written, and a resumption that fails is a typed failure Media3 reports rather
+                // than a queue of items that will each fail silently once played.
+                val items = withContext(Dispatchers.IO) {
+                    resolution.resolve(snapshot.queue.map { it.requestedMediaItem() }).get()
+                }
+                result.set(
+                    MediaSession.MediaItemsWithStartPosition(items, startIndex, startPositionMs)
+                )
+            } catch (failure: ExecutionException) {
+                result.setException(failure.cause ?: failure)
+            } catch (failure: Throwable) {
+                result.setException(failure)
+            }
+        }
+        return result
+    }
 
     private fun rootItem(): MediaItem =
         MediaItem.Builder()

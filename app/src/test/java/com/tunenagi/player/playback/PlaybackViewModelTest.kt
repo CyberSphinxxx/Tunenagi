@@ -29,6 +29,8 @@ class PlaybackViewModelTest {
         var connects = 0
         var disconnects = 0
         var toggles = 0
+        var retries = 0
+        var played: List<List<com.tunenagi.core.model.TrackId>> = emptyList()
 
         override fun connect() {
             connects++
@@ -40,6 +42,14 @@ class PlaybackViewModelTest {
 
         override fun togglePlayPause() {
             toggles++
+        }
+
+        override fun retry() {
+            retries++
+        }
+
+        override fun playTracks(trackIds: List<com.tunenagi.core.model.TrackId>) {
+            played = played + listOf(trackIds)
         }
     }
 
@@ -111,6 +121,16 @@ class PlaybackViewModelTest {
         viewModel.togglePlayPause()
 
         assertEquals(2, source.toggles)
+    }
+
+    @Test
+    fun theRetryCommandIsDelegatedToTheSource() {
+        val viewModel = viewModel()
+
+        viewModel.retry()
+
+        assertEquals(1, source.retries)
+        assertEquals("retry is not a play/pause toggle", 0, source.toggles)
     }
 
     @Test

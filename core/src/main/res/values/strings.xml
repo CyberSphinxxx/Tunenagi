@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- The name of the media notification channel, shown by the system in notification settings.
+         It describes what the notifications are (playback controls), not the app again, because
+         the settings screen already shows the app name above it. -->
+    <string name="notification_channel_playback">Playback controls</string>
+
+</resources>

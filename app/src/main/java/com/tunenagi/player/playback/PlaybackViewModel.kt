@@ -39,6 +39,11 @@ class PlaybackViewModel @Inject constructor(
         source.togglePlayPause()
     }
 
+    /** The user's retry after the session's own bounded attempts did not recover the item. */
+    fun retry() {
+        source.retry()
+    }
+
     override fun onCleared() {
         source.disconnect()
         super.onCleared()

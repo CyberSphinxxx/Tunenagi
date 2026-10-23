@@ -11,16 +11,19 @@ import androidx.media3.session.SessionError
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.tunenagi.core.database.Fixtures
+import com.tunenagi.core.database.TunenagiDatabase
 import com.tunenagi.core.database.TunenagiMappers
 import com.tunenagi.core.model.PlaybackSnapshot
 import com.tunenagi.core.model.QueueItem
 import com.tunenagi.core.model.QueueItemId
 import com.tunenagi.core.model.RepeatMode
+import com.tunenagi.core.model.Track
 import com.tunenagi.core.model.TrackId
 import com.tunenagi.core.model.TrackSourceId
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -173,6 +176,24 @@ class TunenagiPlaybackServiceTest {
         // nothing can report a failure during service shutdown.
         engine.release()
         assertTrue(engine.isReleased)
+    }
+
+    /**
+     * TUN-0207's session half: the service owns one recovery loop, it starts idle, and it is
+     * dropped with the player it would otherwise prepare.
+     */
+    @Test
+    fun theServiceOwnsOneRecoveryLoopAndStopsItWithThePlayer() {
+        val service = startedService()
+        try {
+            val recovery = service.playbackRecovery
+            assertNotNull("a running service must watch its player for failures", recovery)
+            assertEquals(PlaybackStatus.Idle, recovery!!.status.value)
+        } finally {
+            service.onDestroy()
+        }
+
+        assertNull("a retry must not outlive the service's player", service.playbackRecovery)
     }
 
     @Test
@@ -424,15 +445,11 @@ class TunenagiPlaybackServiceTest {
         val at = Instant.parse("2026-10-17T00:00:00Z")
         val database = Fixtures.databaseOnCallerThread()
         val queue = RoomQueueRepository(database)
-        val tracks = runBlocking {
-            listOf("One", "Two", "Three").map { title ->
-                val track = Fixtures.track(title = title)
-                database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at))
-                track.id
-            }.also { trackIds ->
-                queue.replaceQueue(trackIds, startIndex = 1, at = at)
-                queue.saveProgress(42_000L, at)
-            }
+        val tracks = listOf("One", "Two", "Three").map { title -> Fixtures.track(title = title) }
+        seedTracks(database, at, tracks)
+        runBlocking {
+            queue.replaceQueue(tracks.map { it.id }, startIndex = 1, at = at)
+            queue.saveProgress(42_000L, at)
         }
 
         PlaybackResolution.install(PlaybackGraph(resolution = fixtureResolution(), queue = queue))
@@ -472,13 +489,10 @@ class TunenagiPlaybackServiceTest {
         val at = Instant.parse("2026-10-17T00:00:00Z")
         val database = Fixtures.databaseOnCallerThread()
         val queue = RoomQueueRepository(database)
+        val tracks = listOf("One", "Two").map { title -> Fixtures.track(title = title) }
+        seedTracks(database, at, tracks)
         runBlocking {
-            val tracks = listOf("One", "Two").map { title ->
-                val track = Fixtures.track(title = title)
-                database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at))
-                track.id
-            }
-            queue.replaceQueue(tracks, startIndex = 1, at = at)
+            queue.replaceQueue(tracks.map { it.id }, startIndex = 1, at = at)
             val state = database.playbackStateDao().current()!!
             // The pointer now names an item that does not exist, while the progress still does.
             database.playbackStateDao().upsert(
@@ -521,10 +535,8 @@ class TunenagiPlaybackServiceTest {
         val database = Fixtures.databaseOnCallerThread()
         val queue = RoomQueueRepository(database)
         val track = Fixtures.track(title = "Gone")
-        runBlocking {
-            database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at))
-            queue.replaceQueue(listOf(track.id), startIndex = 0, at = at)
-        }
+        seedTracks(database, at, listOf(track))
+        runBlocking { queue.replaceQueue(listOf(track.id), startIndex = 0, at = at) }
 
         val refusing = MediaItemResolution { requested ->
             Futures.immediateFailedFuture<List<MediaItem>>(
@@ -582,18 +594,21 @@ class TunenagiPlaybackServiceTest {
         val database = Fixtures.databaseOnCallerThread()
         val counting = CountingQueue(RoomQueueRepository(database))
         val track = Fixtures.track(title = "One")
-        runBlocking { database.trackDao().insert(TunenagiMappers.toTrackEntity(track, at, at)) }
+        seedTracks(database, at, listOf(track))
 
         PlaybackResolution.install(PlaybackGraph(resolution = fixtureResolution(), queue = counting))
         try {
             val service = startedService()
             try {
                 runBlocking { service.queueCommands!!.play(listOf(track.id)) }
-                val before = counting.progressWrites.size
+                // Drain the checkpoints `play` triggered through player events first, so the write
+                // counted below can only be the one `onTaskRemoved` is responsible for.
+                shadowOf(Looper.getMainLooper()).idle()
+                val before = counting.progressWrites.get()
 
                 service.onTaskRemoved(null)
 
-                awaitCondition("the swipe-away checkpoint") { counting.progressWrites.size > before }
+                awaitCondition("the swipe-away checkpoint") { counting.progressWrites.get() > before }
             } finally {
                 service.onDestroy()
             }
@@ -601,6 +616,12 @@ class TunenagiPlaybackServiceTest {
             PlaybackResolution.reset()
         }
     }
+
+    /** Tracks must exist before a queue can name them: the queue table has a foreign key to them. */
+    private fun seedTracks(database: TunenagiDatabase, at: Instant, tracks: List<Track>) =
+        runBlocking {
+            tracks.forEach { database.trackDao().insert(TunenagiMappers.toTrackEntity(it, at, at)) }
+        }
 
     private fun fixtureResolution(): MediaItemResolution = MediaItemResolution { requested ->
         Futures.immediateFuture(
@@ -629,7 +650,11 @@ class TunenagiPlaybackServiceTest {
     /** A queue repository that counts progress writes, so "the position was written" is assertable. */
     private class CountingQueue(private val delegate: QueueRepository) : QueueRepository {
 
-        val progressWrites = mutableListOf<Long>()
+        /**
+         * Atomic because the write under test runs on a scope of its own, not on the test thread:
+         * an `ArrayList` read from another thread would be a data race in the assertion itself.
+         */
+        val progressWrites = AtomicInteger()
 
         override fun observe(): Flow<PlaybackSnapshot> = delegate.observe()
 
@@ -657,7 +682,7 @@ class TunenagiPlaybackServiceTest {
         override suspend fun setShuffle(enabled: Boolean, seed: Int, at: Instant) = delegate.setShuffle(enabled, seed, at)
 
         override suspend fun saveProgress(progressMs: Long, at: Instant) {
-            progressWrites += progressMs
+            progressWrites.incrementAndGet()
             delegate.saveProgress(progressMs, at)
         }
 

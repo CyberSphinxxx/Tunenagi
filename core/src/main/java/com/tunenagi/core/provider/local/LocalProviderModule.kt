@@ -1,6 +1,8 @@
 package com.tunenagi.core.provider.local
 
 import android.content.Context
+import com.tunenagi.core.database.TunenagiDatabase
+import com.tunenagi.core.model.LocalFolderImporter
 import com.tunenagi.core.model.PlaybackSourceResolver
 import dagger.Module
 import dagger.Provides
@@ -30,6 +32,23 @@ object LocalProviderModule {
     @Provides
     @Singleton
     fun recentResolveDiagnostics(): RecentResolveDiagnostics = RecentResolveDiagnostics()
+
+    /**
+     * The folder import the UI calls.
+     *
+     * Provided here, beside the discovery it composes, so the app injects the domain interface and
+     * never names `core.provider` or `core.database` (B7). The content resolver is the platform's;
+     * the database is the same singleton every other library writer uses.
+     */
+    @Provides
+    @Singleton
+    fun localFolderImporter(
+        @ApplicationContext context: Context,
+        database: TunenagiDatabase
+    ): LocalFolderImporter = LocalFolderImport(
+        database = database,
+        rows = ContentResolverAudioRows(context.contentResolver)
+    )
 
     @Provides
     @IntoSet

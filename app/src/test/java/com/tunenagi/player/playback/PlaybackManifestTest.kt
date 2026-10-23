@@ -60,10 +60,40 @@ class PlaybackManifestTest {
     }
 
     @Test
+    fun theServiceAdvertisesTheSessionServiceActionToo() {
+        val declared = context.packageManager
+            .queryIntentServices(Intent(MEDIA_SESSION_SERVICE_ACTION), PackageManager.MATCH_ALL)
+            .map { it.serviceInfo.name }
+
+        assertTrue(
+            "the merged manifest must declare $MEDIA_SESSION_SERVICE_ACTION (found: $declared)",
+            declared.any { it.endsWith("TunenagiPlaybackService") }
+        )
+    }
+
+    /**
+     * The receiver is what makes a headset/Bluetooth media button work while the app is cold. It is
+     * exported because the sender is the platform or another device, and it must be exported exactly
+     * for that one action - a receiver that silently stopped being exported is a control that only
+     * works while the app is already open.
+     */
+    @Test
+    fun mediaButtonsRouteToThePlaybackServiceThroughAnExportedReceiver() {
+        val info = context.packageManager.getReceiverInfo(
+            ComponentName(context, MEDIA_BUTTON_RECEIVER),
+            PackageManager.GET_META_DATA
+        )
+
+        assertNotNull("the media button receiver must be declared", info)
+        assertTrue("the platform has to be able to reach it", info.exported)
+    }
+
+    @Test
     fun thePermissionsPlaybackNeedsAreRequested() {
         listOf(
             "android.permission.FOREGROUND_SERVICE",
             "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+            "android.permission.POST_NOTIFICATIONS",
             "android.permission.WAKE_LOCK"
         ).forEach { permission ->
             assertEquals(
@@ -92,5 +122,7 @@ class PlaybackManifestTest {
 
     private companion object {
         const val MEDIA_LIBRARY_SERVICE_ACTION = "androidx.media3.session.MediaLibraryService"
+        const val MEDIA_SESSION_SERVICE_ACTION = "androidx.media3.session.MediaSessionService"
+        const val MEDIA_BUTTON_RECEIVER = "androidx.media3.session.MediaButtonReceiver"
     }
 }

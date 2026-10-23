@@ -66,9 +66,10 @@ class PlaybackQueueCommands(
      * but the player is not even prepared, which also means no decoder, no audio focus request and no
      * buffer for a queue nobody asked to hear.
      *
-     * The caller that *does* hold the platform's resumption contract passes `play = true`; that is the
-     * only path that prepares and plays. It is not wired here yet: the platform's resumption entry
-     * point belongs with the media controls in TUN-0206, and this method is the seam it will use.
+     * Explicit callers that hold a resumption request pass `play = true`; that is the only path here
+     * that prepares and plays. The platform's own resumption request does not come through this
+     * method: `TunenagiMediaLibraryCallback.onPlaybackResumption` answers it with the stored items and
+     * Media3 applies and starts them, which is why a normal service start still passes `false`.
      *
      * Returns `null` when the store holds no queue, which is not a failure - a first launch has
      * nothing to restore, and the UI shows its empty state rather than an error. A failure to resolve
@@ -250,6 +251,11 @@ class PlaybackQueueCommands(
         val index = snapshot.queue.indexOfFirst { it.id == snapshot.currentItemId }.coerceAtLeast(0)
         val items = resolved(snapshot.queue.map { item(it) })
         player.setMediaItems(items, index, resumeMs)
+        // The repeat mode is part of the stored queue's state, not a preference of this particular
+        // player: a service restart builds a new player whose default is off, and Media3's own
+        // advance at the end of a track follows the player rather than [next]. Re-applying it here
+        // is what makes "Repeat All" survive a relaunch instead of silently becoming "Off".
+        player.repeatMode = snapshot.repeatMode.toPlayerRepeatMode()
         // `prepare` is what turns the ids into audio; `play` is only ever true when the caller asked
         // for sound (a new queue, or the platform's resumption contract) or something was already
         // playing (an edit mid-listen), so a command never starts playback the user had paused.
@@ -257,17 +263,7 @@ class PlaybackQueueCommands(
         if (play) player.play()
     }
 
-    private fun item(entry: QueueItem): MediaItem =
-        MediaItem.Builder().setMediaId(mediaIdFor(entry)).build()
-
-    /**
-     * A queue item names its source when the user picked one (`sourceOverrideId`) and its track
-     * otherwise, so the preferred source is chosen at resolve time rather than frozen into the queue.
-     */
-    private fun mediaIdFor(entry: QueueItem): String {
-        val override = entry.sourceOverrideId
-        return if (override != null) MediaItemIds.source(override) else MediaItemIds.track(entry.trackId)
-    }
+    private fun item(entry: QueueItem): MediaItem = entry.requestedMediaItem()
 
     private suspend fun resolved(items: List<MediaItem>): List<MediaItem> =
         // The resolution is asynchronous and may read the database and the file system; keeping it
@@ -303,6 +299,21 @@ class PlaybackQueueCommands(
          */
         const val RESTART_THRESHOLD_MS = 3_000L
     }
+}
+
+/**
+ * The media item a stored queue entry asks the resolver for.
+ *
+ * A queue item names its source when the user picked one (`sourceOverrideId`) and its track
+ * otherwise, so the preferred source is chosen at resolve time rather than frozen into the queue.
+ * This lives outside the command class because the platform's resumption callback asks the same
+ * question about the same stored queue ([TunenagiMediaLibraryCallback.onPlaybackResumption]); two
+ * copies of the id convention would be two chances to resume the wrong track.
+ */
+internal fun QueueItem.requestedMediaItem(): MediaItem {
+    val override = sourceOverrideId
+    val mediaId = if (override != null) MediaItemIds.source(override) else MediaItemIds.track(trackId)
+    return MediaItem.Builder().setMediaId(mediaId).build()
 }
 
 /** `SPEC/AUDIO_ENGINE.md`'s repeat modes, as Media3 expresses them. */

@@ -1,27 +1,12 @@
 # Tunenagi (繋ぎ)
 
-An open-source, source-neutral music player for Android built with modern Android development standards: **Kotlin 2.0**, **Jetpack Compose (Material 3)**, and **AndroidX Media3 (ExoPlayer)**.
-
-Tunenagi (*繋ぎ*, meaning connection or link) unifies your music experience across local audio files, open web streaming (Audius), synchronized lyrics (LRCLIB), and community metadata enrichment (MusicBrainz) into a single playback queue.
+An open-source, architecture-first music player for Android built with modern native technologies: Kotlin, Jetpack Compose, AndroidX Media3 (ExoPlayer), Room, and Hilt. Tunenagi bridges local audio playback with online streaming sources (Audius), lyrics enrichment (LRCLIB), and metadata services (MusicBrainz) under a unified, source-neutral data model.
 
 ---
 
-## Highlights & Features
+## Technical Stack & Toolchain
 
-- **High-Fidelity Audio Engine**: Built on AndroidX Media3 ExoPlayer running in a dedicated `MediaLibraryService`. Supports background playback, lock screen media controls, media notifications, audio focus handling, and seamless queue management.
-- **Local Audio Discovery**: Fast MediaStore indexing with Storage Access Framework (SAF) support, directory browsing, tag parsing, and album artwork extraction.
-- **Unified Queue & Persistence**: Backed by Room database with persistent playback checkpoints debounced to survive application restarts and swipe-aways.
-- **Open Web Providers**: Stream open-access music via public Audius APIs respecting creator licensing.
-- **Synchronized Lyrics**: Embedded and remote synchronized/plain lyrics retrieval powered by LRCLIB.
-- **Metadata Enrichment**: Optional MusicBrainz metadata integration to enrich artist and release information without locking playback to network availability.
-- **Declarative Plugin Architecture**: Restricted declarative JSON/HTTP provider specification for extensible catalogs without dynamic script execution risks.
-- **Modern Jetpack Compose UI**: 100% declarative UI with Material 3 styling, dynamic themes, smooth transitions, and responsive layouts across phones and tablets.
-
----
-
-## Tech Stack & Pinned Toolchain
-
-| Component | Pinned Version / Technology |
+| Component | Technology / Version |
 |---|---|
 | **Language** | Kotlin 2.0.20 |
 | **Android Gradle Plugin** | AGP 8.7.3 |
@@ -61,12 +46,13 @@ Tunenagi (*繋ぎ*, meaning connection or link) unifies your music experience ac
 │       └── provider/           # Local MediaStore indexer and external provider adapters
 ├── gradle/                     # Version catalog and Gradle wrapper distribution
 │   └── libs.versions.toml      # Single source of truth for build dependencies
-├── build_loop/                 # Autonomous development loop & verification harness
-│   ├── OPERATIONS/             # CI, state protocols, and git conventions
-│   ├── PHASES/                 # Phase implementation roadmap
-│   ├── SCRIPTS/                # Hygiene gates, formatting, and validation scripts
-│   ├── SPEC/                   # Architecture, PRD, UX design, and engine specs
-│   └── STATE/                  # Task tracking graph and evidence records
+├── OPERATIONS/                 # CI, state protocols, and git conventions
+├── PHASES/                     # Phase implementation roadmap
+├── PROMPTS/                    # Autonomous agent instructions and audit prompts
+├── SCRIPTS/                    # Hygiene gates, formatting, and validation scripts
+├── SKILLS/                     # Workflow references and implementation guides
+├── SPEC/                       # Architecture, PRD, UX design, and engine specs
+├── STATE/                      # Task tracking graph and evidence records
 ├── build.gradle.kts            # Root build configuration
 ├── settings.gradle.kts         # Module settings (:app, :core)
 └── gradle.properties           # Project-wide properties (SDK levels, JVM args)
@@ -155,21 +141,20 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ## Development Loop & Hygiene Gates
 
-The repository includes automated hygiene gates under [`build_loop/`](build_loop/) to verify code formatting, architecture boundaries, package consistency, and CI definitions:
+The repository includes automated hygiene gates under [`SCRIPTS/`](SCRIPTS/) to verify code formatting, architecture boundaries, package consistency, and CI definitions:
 
 ```bash
 # Run fast hygiene validation (packaging, formatting, boundaries, CI definition)
-python build_loop/SCRIPTS/verify.py --fast
+python SCRIPTS/verify.py --fast
 
-# Or run individual checks directly inside build_loop:
-cd build_loop
+# Or run individual checks directly:
 python SCRIPTS/validate_package.py   # Verifies task graph and packaging
 python SCRIPTS/check_format.py       # Enforces tab, trailing space, and line ending rules
 python SCRIPTS/check_boundaries.py   # Verifies architectural layer dependencies
 python SCRIPTS/check_ci.py           # Validates CI workflow pins and commands
 ```
 
-For full details on the specification, architecture contracts, and agent loop workflows, refer to [`build_loop/README.md`](build_loop/README.md) and [`build_loop/SPEC/ARCHITECTURE.md`](build_loop/SPEC/ARCHITECTURE.md).
+For full details on the specification, architecture contracts, and agent loop workflows, refer to [`START_HERE.md`](START_HERE.md) and [`SPEC/ARCHITECTURE.md`](SPEC/ARCHITECTURE.md).
 
 ---
 

@@ -5,12 +5,15 @@ import android.content.Context
 import androidx.annotation.OptIn
 import androidx.core.content.ContextCompat
 import androidx.media3.common.Player
+import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionError
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
+import com.tunenagi.core.playback.MediaItemIds
 import com.tunenagi.core.playback.TunenagiPlaybackService
+import com.tunenagi.core.model.TrackId
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -164,5 +167,33 @@ class PlaybackConnection @Inject constructor(
         // `play()` on an idle player with an empty queue does nothing and is not an error; the
         // caller sees the unchanged state through `nowPlaying` rather than a silent lie.
         if (attached.isPlaying) attached.pause() else attached.play()
+    }
+
+    override fun playTracks(trackIds: List<TrackId>) {
+        val attached = controller
+        if (attached == null) {
+            _connection.value = NowPlayingSource.Connection.Failed(
+                "playback is not connected, so the queue could not be started"
+            )
+            return
+        }
+        if (trackIds.isEmpty()) return
+        // Only the media id crosses the process boundary; the session resolves each one through the
+        // library (TUN-0203), so an imported track that has become unavailable fails with a typed
+        // error instead of being handed a uri this side guessed.
+        val items = trackIds.map { id ->
+            MediaItem.Builder().setMediaId(MediaItemIds.track(id)).build()
+        }
+        attached.setMediaItems(items, 0, 0L)
+        attached.prepare()
+        attached.play()
+    }
+
+    override fun retry() {
+        val attached = controller ?: return
+        // Media3 keeps `playWhenReady` across a playback error, so `prepare()` re-opens the item
+        // and resumes only when the user had asked for sound. Calling `play()` here would turn a
+        // manual retry after a deliberate pause into an autoplay surprise.
+        attached.prepare()
     }
 }

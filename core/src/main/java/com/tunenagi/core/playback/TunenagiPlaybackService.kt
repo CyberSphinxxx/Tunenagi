@@ -1,7 +1,9 @@
 package com.tunenagi.core.playback
 
 import android.content.Intent
+import androidx.annotation.OptIn
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +48,16 @@ open class TunenagiPlaybackService : MediaLibraryService() {
     private val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     /**
+     * The scope the last checkpoint is dispatched on when the task goes away.
+     *
+     * Its own scope, so [onDestroy]'s cancellation of [sessionScope] cannot take the write with it;
+     * `Main.immediate`, so the flush reads the player on this callback's thread before anything else
+     * can run. The job is never cancelled - the write is one statement and the process, not the
+     * service, decides when to reclaim it.
+     */
+    private val lastCheckpointScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /**
      * The callback the session was built with.
      *
      * Held as a named field rather than constructed inline so a test can drive the same instance
@@ -56,7 +68,15 @@ open class TunenagiPlaybackService : MediaLibraryService() {
      * is created by the OS, so it has no constructor to be handed one (ADR-013). Reading it here
      * means the session and its callback cannot disagree about how a media id is resolved.
      */
-    internal val sessionCallback = TunenagiMediaLibraryCallback(PlaybackResolution.current().resolution)
+    internal val sessionCallback = PlaybackResolution.current().let { graph ->
+        // The queue is the same graph the commands persist through, and the scope is this service's:
+        // a resumption read must not outlive the service that would apply its answer.
+        TunenagiMediaLibraryCallback(
+            resolution = graph.resolution,
+            queue = graph.queue,
+            scope = sessionScope
+        )
+    }
 
     /**
      * The queue commands this session applies, or `null` when the host installed no library.
@@ -76,6 +96,17 @@ open class TunenagiPlaybackService : MediaLibraryService() {
      * long as there is a player to be at a position in (TUN-0205).
      */
     internal var progressRecorder: PlaybackProgressRecorder? = null
+        private set
+
+    /**
+     * The bounded error-recovery loop over the service's player (TUN-0207), or `null` when the
+     * service is not running.
+     *
+     * Owned here rather than by the UI so every failure the player raises - from a lockscreen
+     * command, a resumption or the app - gets the same policy. It is detached and cancelled in
+     * [onDestroy], because a retry that outlived its player would prepare nothing.
+     */
+    internal var playbackRecovery: PlaybackRecovery? = null
         private set
 
     /**
@@ -100,10 +131,26 @@ open class TunenagiPlaybackService : MediaLibraryService() {
     /** The session this service owns, or `null` before [onCreate] / after [onDestroy]. */
     internal val ownedSession: MediaLibraryService.MediaLibrarySession? get() = library
 
+    @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
+        // Installed before the session exists, because MediaSessionService reads the provider once
+        // when the session is added. Media3 owns when the notification is posted, updated, moved to
+        // the foreground and removed; this only fixes the channel and the notification id
+        // (`TunenagiNotifications` explains why those are part of the contract).
+        setMediaNotificationProvider(TunenagiNotifications.provider(this))
         val playbackEngine = TunenagiPlaybackEngine(this)
         engine = playbackEngine
+        // A failure is retried at most twice, on the main thread, through the player this service
+        // owns. `prepare()` is the whole retry: it re-opens the failed item rather than inventing
+        // a replacement source, and it resumes only if `playWhenReady` still reflects the user's
+        // intent.
+        val recovery = PlaybackRecovery(
+            retry = { playbackEngine.player.prepare() },
+            scheduler = HandlerRetryScheduler()
+        )
+        playbackEngine.player.addListener(recovery)
+        playbackRecovery = recovery
         val graph = PlaybackResolution.current()
         queueCommands = graph.queue?.let { queue ->
             PlaybackQueueCommands(
@@ -161,14 +208,19 @@ open class TunenagiPlaybackService : MediaLibraryService() {
      *   `super.onTaskRemoved` when nothing is playing, and [onDestroy] cancels that scope - a flush
      *   launched on it could be cancelled before Room had run the UPDATE. The last checkpoint is
      *   therefore dispatched on a scope of its own, which is one write and then unreachable.
-     * - **It cannot be awaited.** `onTaskRemoved` runs on the main thread and a database write is
-     *   asynchronous, so this is best-effort by construction: the honest guarantee remains "at most
-     *   one interval of position is lost", and this narrows it for the swipe-away case instead of
-     *   pretending to close it.
+     * - **It starts on this thread, not on a background one.** The player may only be read on the
+     *   main thread (Media3 enforces it), and it may be released by [onDestroy] as soon as this
+     *   callback returns. A flush launched on `Dispatchers.IO` would queue its player read behind
+     *   whatever the main thread does next - including that release - so the numbers would be read
+     *   after they stopped existing. An immediate main-thread launch reads them *now*, before
+     *   `super.onTaskRemoved` can stop anything, and only the database part is left asynchronous.
+     * - **It cannot be awaited.** A database write is asynchronous, so this is best-effort by
+     *   construction: the honest guarantee remains "at most one interval of position is lost", and
+     *   this narrows it for the swipe-away case instead of pretending to close it.
      */
     override fun onTaskRemoved(rootIntent: Intent?) {
         progressRecorder?.let { recorder ->
-            CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).launch { recorder.flush() }
+            lastCheckpointScope.launch { recorder.flush() }
         }
         super.onTaskRemoved(rootIntent)
     }
@@ -177,6 +229,11 @@ open class TunenagiPlaybackService : MediaLibraryService() {
         // Detach before the engine goes: a listener left on a released player would be called for
         // events that no longer describe anything, and its ticker would write positions for a queue
         // this service no longer owns.
+        playbackRecovery?.let { recovery ->
+            engine?.player?.removeListener(recovery)
+            recovery.cancel()
+        }
+        playbackRecovery = null
         progressRecorder?.stop()
         progressRecorder = null
         library?.release()

@@ -4,13 +4,16 @@ import android.os.SystemClock
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import java.time.Instant
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Writes where the user is, rarely enough to be safe and often enough to be true — owned.
@@ -56,12 +59,34 @@ class PlaybackProgressRecorder(
      * Monotonic time for the interval gate. `SystemClock`'s uptime rather than the wall clock: a
      * user changing the device clock or a DST jump must not collapse or stretch the interval.
      */
-    private val monotonicMs: () -> Long = SystemClock::elapsedRealtime
+    private val monotonicMs: () -> Long = SystemClock::elapsedRealtime,
+    /**
+     * The thread the player may be touched on.
+     *
+     * Media3 confines a player to the application's main thread and *enforces* it - reading a
+     * position from anywhere else throws `IllegalStateException` (measured: that is exactly what the
+     * swipe-away flush in `TunenagiPlaybackService.onTaskRemoved` did before this seam existed). A
+     * checkpoint is often dispatched from somewhere else, so the player-derived numbers are read
+     * here and only those numbers travel to the database work.
+     */
+    private val playerContext: CoroutineContext = Dispatchers.Main.immediate
 ) : Player.Listener {
 
     private val mutex = Mutex()
     private var lastWriteAtMs: Long? = null
     private var ticker: Job? = null
+
+    /**
+     * Whether this recorder may still touch its player.
+     *
+     * Cleared by [stop], because whoever stops a recorder is the owner about to release the player: a
+     * flush still in flight must then record nothing rather than read a released player. The read in
+     * [checkpoint] happens on [playerContext] and so does [stop], which is what makes the check an
+     * ordering rather than a race. Tests that drive [checkpoint] directly without ever starting the
+     * recorder never detach, so a standalone checkpoint still reads its player.
+     */
+    @Volatile
+    private var attached = true
 
     /** Whether this recorder is attached to its player and ticking. */
     val isRunning: Boolean get() = ticker?.isActive == true
@@ -73,6 +98,7 @@ class PlaybackProgressRecorder(
      * records - the same reason the session's commands are dropped when the service is destroyed.
      */
     fun start() {
+        attached = true
         player.addListener(this)
         ticker?.cancel()
         ticker = scope.launch {
@@ -87,6 +113,7 @@ class PlaybackProgressRecorder(
 
     /** Detaches and stops ticking. Deliberately does not write; see the class note. */
     fun stop() {
+        attached = false
         player.removeListener(this)
         ticker?.cancel()
         ticker = null
@@ -98,20 +125,23 @@ class PlaybackProgressRecorder(
     /**
      * Stores the position the user is at, at most once per [intervalMs] unless [force]d.
      *
-     * Returns the position written, or `null` when nothing was written. That is one of three things,
-     * none of them an error: the store has no queue to attach a position to, the player and the store
-     * disagree about the queue's length (a command is mid-reapply), or the interval has not elapsed
-     * yet and the call was not forced.
+     * Returns the position written, or `null` when nothing was written. That is one of four things,
+     * none of them an error: the recorder has been [stop]ped (and so may no longer touch its player),
+     * the store has no queue to attach a position to, the player and the store disagree about the
+     * queue's length (a command is mid-reapply), or the interval has not elapsed yet and the call was
+     * not forced. The player half is read on [playerContext]; everything else runs where the caller
+     * put it, so this is safe to call from a background scope.
      */
     suspend fun checkpoint(force: Boolean = false): Long? {
+        val observed = observePlayer() ?: return null
+
         val stored = queue.snapshot()
         if (stored.queue.isEmpty()) return null
         // The player's items are the stored queue in the stored order while a session is alive; a
         // mismatch means a command is mid-reapply or the player was rebuilt, and a position read now
         // belongs to no item in particular.
-        if (player.mediaItemCount != stored.queue.size) return null
-        val entry = stored.queue.getOrNull(player.currentMediaItemIndex) ?: return null
-        val positionMs = resumePositionMs(player.playbackState, player.currentPosition)
+        if (observed.itemCount != stored.queue.size) return null
+        val entry = stored.queue.getOrNull(observed.index) ?: return null
 
         mutex.withLock {
             val now = monotonicMs()
@@ -120,11 +150,30 @@ class PlaybackProgressRecorder(
             // The stored current item has to name the item the position belongs to before the
             // position is written, otherwise the pair can be read back as a different track.
             if (entry.id != stored.currentItemId) queue.setCurrent(entry.id)
-            queue.saveProgress(positionMs, clock())
+            queue.saveProgress(observed.positionMs, clock())
             lastWriteAtMs = now
         }
-        return positionMs
+        return observed.positionMs
     }
+
+    /**
+     * Reads the player's side of a checkpoint on the thread that owns it.
+     *
+     * `null` means "nothing to record": the recorder has been detached and its player may be gone.
+     * That is a shutdown path, so it is a value rather than a signal - a flush racing the service's
+     * teardown must not be a crash nobody can report.
+     */
+    private suspend fun observePlayer(): PlayerProgress? = withContext(playerContext) {
+        if (!attached) return@withContext null
+        PlayerProgress(
+            itemCount = player.mediaItemCount,
+            index = player.currentMediaItemIndex,
+            positionMs = resumePositionMs(player.playbackState, player.currentPosition)
+        )
+    }
+
+    /** The numbers a checkpoint takes off the player, once it is safe to take them. */
+    private data class PlayerProgress(val itemCount: Int, val index: Int, val positionMs: Long)
 
     /**
      * A pause is an explicit checkpoint, and so is a resume: the user letting go of the transport is

@@ -1,5 +1,6 @@
 package com.tunenagi.player.ui.shell
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,11 +24,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.tunenagi.core.designsystem.TunenagiSpacing
+import com.tunenagi.core.playback.PlaybackFailure
 import com.tunenagi.player.R
 import com.tunenagi.player.ui.theme.TunenagiColors
 
 const val MINI_PLAYER_TAG = "mini-player"
 const val MINI_PLAYER_TOGGLE_TAG = "mini-player-toggle"
+const val MINI_PLAYER_RETRY_TAG = "mini-player-retry"
 
 /**
  * What the mini-player is showing.
@@ -41,7 +45,11 @@ sealed interface MiniPlayerState {
     data class Track(
         val title: String,
         val artist: String,
-        val isPlaying: Boolean = false
+        val isPlaying: Boolean = false,
+        /** The player is waiting for data; shown instead of the artist line. */
+        val isBuffering: Boolean = false,
+        /** Why playback stopped, when it did; a Retry control is offered alongside it. */
+        val failure: PlaybackFailure? = null
     ) : MiniPlayerState
 }
 
@@ -57,11 +65,13 @@ fun MiniPlayerHost(
     state: MiniPlayerState,
     onExpand: () -> Unit,
     modifier: Modifier = Modifier,
-    onTogglePlayPause: () -> Unit = {}
+    onTogglePlayPause: () -> Unit = {},
+    onRetry: () -> Unit = {}
 ) {
     when (state) {
         MiniPlayerState.None -> Unit
-        is MiniPlayerState.Track -> MiniPlayerBar(state, onExpand, onTogglePlayPause, modifier)
+        is MiniPlayerState.Track ->
+            MiniPlayerBar(state, onExpand, onTogglePlayPause, onRetry, modifier)
     }
 }
 
@@ -70,6 +80,7 @@ private fun MiniPlayerBar(
     track: MiniPlayerState.Track,
     onExpand: () -> Unit,
     onTogglePlayPause: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -95,13 +106,32 @@ private fun MiniPlayerBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (track.artist.isNotEmpty()) {
+                val status = when {
+                    track.failure != null -> stringResource(track.failure.messageRes())
+                    track.isBuffering -> stringResource(R.string.playback_buffering)
+                    else -> null
+                }
+                // A failure replaces the artist line: the reason audio stopped is more important
+                // than who made the track, and showing both would repeat the same row of text.
+                val secondary = status ?: track.artist
+                if (secondary.isNotEmpty()) {
                     Text(
-                        text = track.artist,
+                        text = secondary,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            if (track.failure != null) {
+                IconButton(
+                    onClick = onRetry,
+                    modifier = Modifier.testTag(MINI_PLAYER_RETRY_TAG)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = stringResource(R.string.playback_retry)
                     )
                 }
             }
@@ -125,4 +155,20 @@ private fun MiniPlayerBar(
             }
         }
     }
+}
+
+/**
+ * The sentence a listener needs, per failure kind.
+ *
+ * Kept in the UI layer so the core taxonomy stays free of Android resources, and exhaustive so a
+ * new failure category cannot appear without a written explanation.
+ */
+@StringRes
+private fun PlaybackFailure.messageRes(): Int = when (this) {
+    PlaybackFailure.Timeout -> R.string.playback_error_timeout
+    PlaybackFailure.Network -> R.string.playback_error_network
+    PlaybackFailure.MissingSource -> R.string.playback_error_missing
+    PlaybackFailure.AccessLost -> R.string.playback_error_permission
+    PlaybackFailure.UnsupportedFormat -> R.string.playback_error_unsupported
+    is PlaybackFailure.Unknown -> R.string.playback_error_unknown
 }

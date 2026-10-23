@@ -8,9 +8,15 @@
 
     <!-- A media session service runs in the foreground while audio plays. Android 14 (API 34)
          additionally requires the media-playback-specific permission; declaring it on older
-         releases is harmless. WAKE_LOCK keeps playback alive with the screen off. -->
+         releases is harmless. WAKE_LOCK keeps playback alive with the screen off.
+
+         POST_NOTIFICATIONS is the Android 13+ runtime permission for the media notification. It is
+         declared here so the notification can be shown, and asked for (never required) by the app:
+         a user who denies it still gets playback, because the foreground service does not depend on
+         the notification being visible (see `MainActivity` and `TunenagiNotifications`). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application>
@@ -30,9 +36,24 @@
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="androidx.media3.session.MediaSessionService" />
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
+        <!-- Routes a media button (headset, Bluetooth AVRCP, a system media control that has no
+             live session) to the session service. Exported, because the sender is the platform or
+             another device, not this app; `MediaButtonReceiver` forwards the event to the
+             `MediaSessionService` declared above and does nothing else, so exporting it does not
+             expose the library. Without this declaration media buttons only work while the app is
+             already alive. -->
+        <receiver
+            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

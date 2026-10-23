@@ -42,7 +42,7 @@ jobs:
       run:
         # The kit lives in a subdirectory of this repository, so every relative command
         # below would otherwise run in the wrong directory. check_ci.py enforces this.
-        working-directory: build_loop
+        working-directory: Tunenagi-Agent-Loop
     steps:
       - name: Check out the full history
         uses: actions/checkout@v7
@@ -70,6 +70,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: hygiene
+    defaults:
+      run:
+        working-directory: Tunenagi-Agent-Loop
     steps:
       - name: Check out
         uses: actions/checkout@v7
@@ -99,5 +102,4 @@ jobs:
         run: bash gradlew :app:lintDebug :core:lintDebug
 
       - name: Lint findings stay inside the accepted baseline
-        working-directory: build_loop
         run: python SCRIPTS/check_lint.py

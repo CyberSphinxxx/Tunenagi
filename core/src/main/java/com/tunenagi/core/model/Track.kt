@@ -50,7 +50,11 @@ data class Track(
     val albumId: AlbumId? = null,
     val isrc: String? = null,
     val mbid: String? = null,
-    val artworkRef: String? = null
+    val artworkRef: String? = null,
+    val artistHandle: String? = null,
+    val permalink: String? = null,
+    val artworkUrl: String? = null,
+    val genre: String? = null
 ) {
     init {
         require(title.isNotBlank()) { "Track title must not be blank" }
@@ -64,7 +68,8 @@ data class Artist(
     val id: ArtistId,
     val name: String,
     val sortName: String = TitleSort.key(name),
-    val mbid: String? = null
+    val mbid: String? = null,
+    val handle: String? = null
 ) {
     init {
         require(name.isNotBlank()) { "Artist name must not be blank" }

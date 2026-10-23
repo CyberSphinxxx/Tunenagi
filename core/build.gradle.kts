@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
@@ -106,6 +107,7 @@ dependencies {
     ksp(libs.room.compiler)
 
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -131,4 +133,16 @@ tasks.withType<Test>().configureEach {
         "tunenagi.versionCatalog",
         rootProject.layout.projectDirectory.file("gradle/libs.versions.toml").asFile.absolutePath
     )
+
+    // The live provider smoke (TUN-0306) is opt-in and CI must never call the provider
+    // (ADR-017, SPEC/PROVIDERS.md): without this property the suite's Assume skips it, and
+    // with it Gradle forwards the flag to the test JVM and echoes the stdout that carries
+    // the recorded statuses. `providers.systemProperty` rather than `System.getProperty` so
+    // the configuration cache treats the flag as a real input instead of replaying a stale
+    // configuration that never saw it.
+    val audiusLive = providers.systemProperty("audius.live")
+    if (audiusLive.isPresent) {
+        systemProperty("audius.live", audiusLive.get())
+        testLogging.showStandardStreams = true
+    }
 }
