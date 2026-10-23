@@ -40,6 +40,22 @@ interface SourceMatchRepository {
     suspend fun lockedSource(trackId: TrackId): TrackSource?
 
     /**
+     * Every stored source of a track, preferred first - the whole list the source inspector shows.
+     * The order is the database's own (preferred, then provider, then id), so the screen and
+     * `preferredSource` read the same ranking rather than inventing a second one.
+     */
+    suspend fun sourcesFor(trackId: TrackId): List<TrackSource>
+
+    /**
+     * The user's manual override, in one persisted step: [sourceId] becomes the track's only
+     * preferred source *and* its only locked one, so a later scan or a better-scoring candidate
+     * cannot move away from it (`SPEC/DATA_MODEL.md`: "manual overrides trump heuristics").
+     * A source that does not exist, or belongs to another track, is refused rather than silently
+     * locking whatever happens to share an id shape.
+     */
+    suspend fun chooseSource(trackId: TrackId, sourceId: TrackSourceId): TrackSource
+
+    /**
      * Which source playback should use: a locked one if the user locked one, else the preferred one,
      * else nothing. A provider failure therefore cannot silently move a user's choice.
      */
@@ -104,6 +120,25 @@ class RoomSourceMatchRepository(
 
     override suspend fun lockedSource(trackId: TrackId): TrackSource? =
         database.sourceDao().lockedFor(trackId.value).firstOrNull()?.let(TunenagiMappers::toTrackSource)
+
+    override suspend fun sourcesFor(trackId: TrackId): List<TrackSource> =
+        database.sourceDao().forTrack(trackId.value).map(TunenagiMappers::toTrackSource)
+
+    override suspend fun chooseSource(trackId: TrackId, sourceId: TrackSourceId): TrackSource {
+        val chosen = database.sourceDao().byId(sourceId.value)
+            ?: throw IllegalArgumentException("Cannot choose a source that does not exist: $sourceId")
+        require(chosen.trackId == trackId.value) {
+            "Cannot choose source $sourceId: it belongs to track ${chosen.trackId}, not $trackId"
+        }
+        // Preferred is what playback reads and locked is what matching must not move; a choice
+        // that set only one of the two would evaporate the moment something else was preferred.
+        database.sourceDao().markPreferred(trackId.value, sourceId.value)
+        for (other in database.sourceDao().lockedFor(trackId.value)) {
+            if (other.id != sourceId.value) database.sourceDao().setLocked(other.id, false)
+        }
+        database.sourceDao().setLocked(sourceId.value, true)
+        return TunenagiMappers.toTrackSource(database.sourceDao().byId(sourceId.value)!!)
+    }
 
     override suspend fun preferredSource(trackId: TrackId): TrackSource? {
         val confirmed = confirmedMatch(trackId)

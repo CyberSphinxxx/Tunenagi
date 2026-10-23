@@ -36,6 +36,7 @@ import com.tunenagi.core.designsystem.TunenagiWindowSize
 import com.tunenagi.core.model.ExternalTrack
 import com.tunenagi.player.discovery.RemoteCatalogUiState
 import com.tunenagi.player.libraryimport.ImportUiState
+import com.tunenagi.player.ui.playback.SourceInspectorUi
 import com.tunenagi.player.ui.screens.HomeScreen
 import com.tunenagi.player.ui.screens.LibraryScreen
 import com.tunenagi.player.ui.screens.PlayerScreen
@@ -73,6 +74,7 @@ fun TunenagiShell(
     onBrowseAudius: () -> Unit = {},
     onPlayTrending: (ExternalTrack) -> Unit = {},
     onRetryTrending: () -> Unit = {},
+    inspector: SourceInspectorUi = SourceInspectorUi.None,
     layout: ShellLayout = TunenagiWindowSize.layoutFor(LocalConfiguration.current.screenWidthDp),
     navController: NavHostController = rememberNavController()
 ) {
@@ -125,6 +127,7 @@ fun TunenagiShell(
                     onBrowseAudius = onBrowseAudius,
                     onPlayTrending = onPlayTrending,
                     onRetryTrending = onRetryTrending,
+                    inspector = inspector,
                     modifier = Modifier.weight(1f)
                 )
                 if (miniPlayerVisible && layout == ShellLayout.Wide) {
@@ -154,6 +157,7 @@ private fun ShellNavHost(
     onBrowseAudius: () -> Unit,
     onPlayTrending: (ExternalTrack) -> Unit,
     onRetryTrending: () -> Unit,
+    inspector: SourceInspectorUi,
     modifier: Modifier = Modifier
 ) {
     val durationMs = TunenagiMotion.navigationDurationMs(motionEnabled)
@@ -191,7 +195,7 @@ private fun ShellNavHost(
             LibraryScreen(onOpenSearch = { navController.switchTab(TunenagiTab.Search) })
         }
         composable(TunenagiRoutes.Player) {
-            PlayerScreen(onClose = { navController.popBackStack() })
+            PlayerScreen(onClose = { navController.popBackStack() }, inspector = inspector)
         }
     }
 }

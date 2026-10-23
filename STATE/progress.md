@@ -138,3 +138,46 @@
   the gated-but-streamable row still fails late at resolve (ADR-018 follow-up) for TUN-0307.
 - **Commit SHA**: see the TUN-0306 commit added after this entry.
 - **Next exact action**: claim TUN-0307 (source inspector and manual preference).
+
+## 2026-10-23T08:25Z - Buffy session (phase 03, TUN-0307)
+
+- **Phase/task**: Phase 03 / TUN-0307 "Source inspector and manual preference" - implemented,
+  executed and recorded from `run_check.py` manifests; phase 03's last task.
+- **Summary**: The inspector reads only the track under the player - the key is the session's own
+  `tunenagi:track:` media id (`MediaItemIds`), so the screen cannot point at another track. It
+  lists every stored source with its identity (provider id rendered as a display name by the
+  screen), its typed status (`SourceStatus`, exhaustive `when`), and the format **the source
+  itself** reported (`TrackSource.contentType`, null never rendered as a guess), with Preferred /
+  Locked badges. The unavailable-variant feedback is `unavailableFeedback`: whichever source
+  `preferredSource` says playback would use, when it is not playable, is called out at the top
+  with its reason so the rows cannot disagree with the player. The manual preference is one
+  persisted write: `SourceMatchRepository.chooseSource` marks the chosen source the track's **only**
+  preferred and **only** locked one (both flags, because either alone evaporates), refuses a
+  missing or foreign source, and `unlock` drops the lock while leaving the preference. The ViewModel
+  refuses an id the current rows never contained *before* the repository is touched, surfacing
+  `ActionFailure.SourceNotListed`/`Rejected` as words on screen rather than an exception. `PlayerScreen`
+  gained the section behind a `SourceInspectorUi` parameter (same pure-shell contract as
+  `PlaybackUi`); `LibraryModule` finally puts `SourceMatchRepository` in the Hilt graph - it had
+  tests but no construction site outside them.
+- **Failing run kept**: `...targeted-tests-first-run.json` (exit 1) - the test's `TrackSource`
+  fixture omitted the required `externalId`; fixed by supplying it, no product code involved.
+- **Change paths**: `core/.../library/SourceMatchRepository.kt`, `core/.../library/LibraryModule.kt`
+  (new), `core/src/test/.../library/SourceMatchRepositoryTest.kt`,
+  `app/.../sourceinspector/SourceInspectorViewModel.kt` (new),
+  `app/.../ui/playback/SourceInspectorUi.kt` (new), `app/.../ui/screens/PlayerScreen.kt`,
+  `app/.../ui/shell/TunenagiShell.kt`, `app/.../MainActivity.kt`,
+  `app/src/main/res/values/strings.xml`,
+  `app/src/test/.../sourceinspector/SourceInspectorViewModelTest.kt` (new),
+  `app/src/sharedTest/.../ui/screens/SourceInspectorScreenTest.kt` (new), `STATE/tasks.json`.
+- **Commands and exit codes (evidence paths)**:
+  - Targeted suites -> exit 0 (`STATE/evidence/TUN-0307/20261023T081935Z-targeted-tests-second-run.json`):
+    `SourceMatchRepositoryTest` 13/13, `SourceInspectorViewModelTest` 7/7,
+    `SourceInspectorScreenTest` 8/8, 0 failures (XML reports of that run).
+  - `python SCRIPTS/verify.py` -> recorded in the manifest named by `taskctl verify` below.
+- **Device / emulator observations**: none - ADR-008. The shared test runs on the JVM under
+  Robolectric and also targets `connectedDebugAndroidTest` when a runtime exists; lock-screen or
+  device-sized rendering of the inspector is part of the standing deferral.
+- **Blockers or risks**: no new P0 blocker. Phase 03 is now task-complete; its independent audit
+  follows in this invocation.
+- **Commit SHA**: see the TUN-0307 commit added after this entry.
+- **Next exact action**: run the phase-03 independent audit (`PROMPTS/02_PHASE_AUDIT.md`).

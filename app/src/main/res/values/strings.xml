@@ -47,6 +47,32 @@
     <string name="player_empty_title">Nothing is playing</string>
     <string name="player_empty_message">Choose a track from Home, Search or your Library to start playback.</string>
 
+    <!-- Source inspector (TUN-0307). Every status is the typed reason the source or the database
+         reported; nothing here is inferred from a file extension or a guess at a provider. -->
+    <string name="source_inspector_title">Source</string>
+    <string name="source_provider_device">This device</string>
+    <string name="source_provider_audius">Audius</string>
+    <string name="source_status_playable">Ready to play</string>
+    <string name="source_status_restricted">Not allowed by the creator</string>
+    <string name="source_status_file_missing">File missing from this device</string>
+    <string name="source_status_permission">Storage access needed</string>
+    <string name="source_status_unavailable">Not available right now</string>
+    <string name="source_status_unchecked">Not checked yet</string>
+    <string name="source_format">Format: %1$s</string>
+    <string name="source_badge_preferred">Preferred</string>
+    <string name="source_badge_locked">Locked</string>
+    <string name="source_use">Use this source</string>
+    <string name="source_unlock">Unlock</string>
+    <string name="source_none">No sources are stored for this track.</string>
+    <string name="source_feedback">Playback would use an unavailable source: %1$s. Choose another below.</string>
+    <string name="source_notice_chosen">Switched playback to %1$s.</string>
+    <string name="source_notice_unlocked">Unlocked. %1$s stays the preferred source.</string>
+    <string name="source_action_failed">That source could not be chosen.</string>
+    <string name="source_not_library_track">Not a library track</string>
+    <string name="source_not_library_track_message">Source details are only shown for a track from your library.</string>
+    <string name="source_loading">Reading sources…</string>
+    <string name="source_loading_message">Asking the library which sources this track has.</string>
+
     <!-- Mini-player transport. The labels are the accessible names of the controls, so they
          describe the action the control performs, not the current state. -->
     <string name="mini_player_play">Play</string>

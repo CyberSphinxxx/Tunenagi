@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import com.tunenagi.player.discovery.RemoteDiscoveryViewModel
 import com.tunenagi.player.libraryimport.LocalImportViewModel
 import com.tunenagi.player.ui.playback.rememberPlaybackUi
+import com.tunenagi.player.ui.playback.rememberSourceInspectorUi
 import com.tunenagi.player.ui.shell.TunenagiShell
 import com.tunenagi.player.ui.theme.TunenagiTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -82,6 +83,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val playback = rememberPlaybackUi()
+                    val inspector = rememberSourceInspectorUi()
                     val importState by importViewModel.state.collectAsStateWithLifecycle()
                     val searchState by discoveryViewModel.searchState.collectAsStateWithLifecycle()
                     val trendingState by discoveryViewModel.trendingState.collectAsStateWithLifecycle()
@@ -98,7 +100,8 @@ class MainActivity : ComponentActivity() {
                         trendingState = trendingState,
                         onBrowseAudius = discoveryViewModel::loadTrending,
                         onPlayTrending = discoveryViewModel::playRemoteTrack,
-                        onRetryTrending = discoveryViewModel::retryTrending
+                        onRetryTrending = discoveryViewModel::retryTrending,
+                        inspector = inspector
                     )
                 }
             }

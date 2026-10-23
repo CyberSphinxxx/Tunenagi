@@ -8,6 +8,7 @@ import com.tunenagi.core.model.ProviderId
 import com.tunenagi.core.model.SourceAvailability
 import com.tunenagi.core.model.Track
 import com.tunenagi.core.model.TrackId
+import com.tunenagi.core.model.TrackSourceId
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -183,5 +184,60 @@ class SourceMatchRepositoryTest {
             runBlocking { repository.confirmMatch(stranger, ProviderId.Audius, "x", score = 0.5, at = Fixtures.now) }
         }
         assertNull(repository.confirmedMatch(stranger))
+    }
+
+    @Test
+    fun sourcesForListsTheTracksSourcesPreferredFirst() = runBlocking {
+        addSource("machine-pick")
+        addSource("user-pick", preferred = true)
+
+        val listed = repository.sourcesFor(trackId)
+
+        assertEquals(listOf("user-pick", "machine-pick"), listed.map { it.externalId })
+    }
+
+    @Test
+    fun choosingASourceMakesItTheOnlyPreferredAndTheOnlyLockedOne() = runBlocking {
+        addSource("first", preferred = true)
+        val second = addSource("second")
+
+        val chosen = repository.chooseSource(trackId, TrackSourceId.parse(second.id))
+
+        assertTrue("a choice is both preferred and locked", chosen.preferred && chosen.locked)
+        val listed = repository.sourcesFor(trackId)
+        assertEquals("second", listed.first().externalId)
+        val first = listed.first { it.externalId == "first" }
+        assertTrue("two choices cannot both be 'the' choice", !first.preferred && !first.locked)
+        assertEquals("second", repository.preferredSource(trackId)!!.externalId)
+
+        // A second choice moves the lock rather than accumulating one.
+        repository.chooseSource(trackId, first.id)
+        val afterMove = repository.sourcesFor(trackId)
+        assertEquals("first", afterMove.first().externalId)
+        assertEquals(1, afterMove.count { it.locked })
+        assertTrue(afterMove.none { it.externalId == "second" && it.locked })
+    }
+
+    @Test
+    fun choosingAMissingOrForeignSourceIsRefusedAndChangesNothing() = runBlocking {
+        addSource("mine")
+        val strangerTrack = TrackId.random()
+        db.trackDao().insert(
+            TunenagiMappers.toTrackEntity(Track(id = strangerTrack, title = "Another Track"), Fixtures.now, Fixtures.now)
+        )
+        val foreign = TunenagiMappers.toTrackSourceEntity(Fixtures.source(strangerTrack, externalId = "theirs"))
+        db.sourceDao().insert(foreign)
+
+        val missing = assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repository.chooseSource(trackId, TrackSourceId.random()) }
+        }
+        assertTrue(missing.message.orEmpty().contains("does not exist"))
+
+        val crossed = assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { repository.chooseSource(trackId, TrackSourceId.parse(foreign.id)) }
+        }
+        assertTrue(crossed.message.orEmpty().contains("belongs to track"))
+
+        assertTrue("a refusal must change nothing", repository.sourcesFor(trackId).none { it.preferred || it.locked })
     }
 }
