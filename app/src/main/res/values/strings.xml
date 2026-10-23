@@ -28,6 +28,15 @@
     <string name="search_empty_title">Search your music</string>
     <string name="search_empty_message">Search will cover music on your device and any sources you add.</string>
 
+    <!-- Remote discovery (Audius). Each state says what is happening, not just that something is,
+         so a trend page that came back empty never looks like a silent failure. -->
+    <string name="browse_audius_title">Browse Audius</string>
+    <string name="browse_audius_start">Browse</string>
+    <string name="browse_audius_loading">Loading Audius trending…</string>
+    <string name="remote_retry">Retry</string>
+    <string name="search_audius_loading">Searching Audius…</string>
+    <string name="search_empty_results">Audius has no results for that search.</string>
+
     <!-- Library -->
     <string name="library_empty_title">Your library is empty</string>
     <string name="library_empty_message">Songs you import or save will appear here.</string>

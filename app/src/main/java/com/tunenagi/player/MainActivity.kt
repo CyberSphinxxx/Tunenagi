@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import com.tunenagi.player.discovery.RemoteDiscoveryViewModel
 import com.tunenagi.player.libraryimport.LocalImportViewModel
 import com.tunenagi.player.ui.playback.rememberPlaybackUi
 import com.tunenagi.player.ui.shell.TunenagiShell
@@ -44,6 +45,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private val importViewModel: LocalImportViewModel by viewModels()
+
+    private val discoveryViewModel: RemoteDiscoveryViewModel by viewModels()
 
     /**
      * The system folder picker, and the grant that outlives it.
@@ -80,12 +83,22 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val playback = rememberPlaybackUi()
                     val importState by importViewModel.state.collectAsStateWithLifecycle()
+                    val searchState by discoveryViewModel.searchState.collectAsStateWithLifecycle()
+                    val trendingState by discoveryViewModel.trendingState.collectAsStateWithLifecycle()
                     TunenagiShell(
                         playerState = playback.state,
                         onTogglePlayPause = playback.onTogglePlayPause,
                         onRetryPlayback = playback.onRetry,
                         importState = importState,
-                        onImportMusic = { folderPicker.launch(null) }
+                        onImportMusic = { folderPicker.launch(null) },
+                        searchState = searchState,
+                        onSearchQuery = discoveryViewModel::search,
+                        onRetrySearch = discoveryViewModel::retrySearch,
+                        onPlayRemoteTrack = discoveryViewModel::playRemoteTrack,
+                        trendingState = trendingState,
+                        onBrowseAudius = discoveryViewModel::loadTrending,
+                        onPlayTrending = discoveryViewModel::playRemoteTrack,
+                        onRetryTrending = discoveryViewModel::retryTrending
                     )
                 }
             }

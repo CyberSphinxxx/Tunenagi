@@ -40,3 +40,56 @@
 - **Blockers or risks**: no live throttling proof (ADR-017); TUN-0306 owns the live smoke. TUN-0305 is now eligible; TUN-0306 needs a device and a currently permitted public track; TUN-0307 depends on TUN-0306 and cannot start before it.
 - **Commit SHA**: see the TUN-0304 commit added after this entry.
 - **Next exact action**: claim TUN-0305 (remote search/discovery UI), surfacing loading, empty, network and restricted/unplayable states, then reassess TUN-0306.
+
+## 2026-10-23T06:40Z - Buffy session (phase 03, TUN-0305)
+
+- **Phase/task**: Phase 03 / TUN-0305 "Remote search/discovery UI" - implemented, executed and
+  verified from a `run_check.py` manifest; this entry was written at the following invocation
+  because the session that did the work was cut short after `taskctl verify` had already succeeded.
+- **Summary**: `RemoteCatalog`/`RemotePage` is the provider-neutral discovery interface the UI is
+  allowed to name (B7): `search`/`trending` return already-normalized `ExternalTrack` rows with
+  `received`/`skipped` diagnostics and an optional `nextOffset`, and `persist` writes chosen rows
+  so play needs only ids. `AudiusRemoteCatalog` implements it in the provider layer and is
+  installed into the app graph (`NetworkModule`, `AudiusProviderModule`), which is the install
+  step TUN-0303's audit said was missing. `RemoteDiscoveryViewModel` owns separate search and
+  trending flows (the two surfaces ask independently) with five honest states - Idle, Loading,
+  Results, Empty(with counts), Error(typed) - a synchronous re-entry guard, retry that replays the
+  last accepted query, and play that **persists first, then plays**, matching the local importer.
+  `SearchScreen` renders the five states exhaustively with a clamped query length, Home gained the
+  Audius trending entry point, and `Track`/`Artist` carry the provider's own attribution fields
+  (handle, permalink, artwork url, genre) for the source inspector instead of losing them.
+- **Corrections found while gating, kept as failing manifests**: `...002413Z-gradle_unit_tests`
+  (exit 1) was the JDK-25 trap from a shell without `JAVA_HOME`, not a code defect;
+  `...002436Z-gradle_unit_tests` (exit 1) caught a real race - `aSecondSearchWhileOneIsRunningIsIgnored`
+  failed because `Loading` was set inside the coroutine, so the flag is now set synchronously in
+  both entry points; `...002949Z-gradle_assemble_lint` (exit 2) was lint-report rejecting a new
+  `ComposableNaming` warning, fixed by renaming the composables rather than widening the baseline.
+- **Change paths**: `core/src/main/java/com/tunenagi/core/model/RemoteCatalog.kt`,
+  `core/src/main/java/com/tunenagi/core/library/RemoteLibraryWriter.kt`,
+  `core/src/main/java/com/tunenagi/core/network/NetworkModule.kt`,
+  `core/src/main/java/com/tunenagi/core/provider/audius/AudiusProviderModule.kt`,
+  `core/src/main/java/com/tunenagi/core/provider/audius/AudiusRemoteCatalog.kt`,
+  `core/src/main/java/com/tunenagi/core/model/Track.kt`,
+  `app/src/main/java/com/tunenagi/player/discovery/RemoteDiscoveryViewModel.kt`,
+  `app/src/test/java/com/tunenagi/player/discovery/RemoteDiscoveryViewModelTest.kt`,
+  `app/src/main/java/com/tunenagi/player/ui/screens/SearchScreen.kt`,
+  `app/src/main/java/com/tunenagi/player/ui/screens/HomeScreen.kt`,
+  `app/src/main/java/com/tunenagi/player/ui/shell/TunenagiShell.kt`,
+  `app/src/main/java/com/tunenagi/player/MainActivity.kt`, `app/src/main/res/values/strings.xml`,
+  `STATE/tasks.json`.
+- **Commands and exit codes (evidence paths)**:
+  - `bash gradlew :core:testDebugUnitTest :app:testDebugUnitTest --rerun` -> exit 0
+    (`STATE/evidence/TUN-0305/20261023T002858Z-gradle_unit_tests.json`); two earlier failing runs kept.
+  - `bash gradlew :app:assembleDebug :app:lintDebug :core:lintDebug` plus `check_lint.py` -> exit 0
+    (`STATE/evidence/TUN-0305/20261023T003257Z-gradle_assemble_lint.json`); the earlier run failed
+    the lint gate and is kept.
+  - `python SCRIPTS/verify.py` -> exit 0, `VERDICT: PASS - 9 step(s) green`
+    (`STATE/evidence/TUN-0305/20261023T003342Z-verify_full.json`).
+- **Device / emulator observations**: none - ADR-008 deferral; the discovery surface has only JVM
+  proof (Robolectric Compose tests plus the ViewModel suite). A fresh emulator attempt this session
+  re-confirmed the documented dead end in `STATE/blockers.md` (no hypervisor driver; TCG guest never
+  executes) and the process was cleaned up.
+- **Blockers or risks**: no live Audius call yet (ADR-017) - TUN-0306 owns it; ADR-018's follow-up
+  still stands (a gated-but-streamable row is discovered late, at resolve, with 401).
+- **Commit SHA**: see the TUN-0305 commit added after this entry.
+- **Next exact action**: claim TUN-0306 (real Audius live smoke), then TUN-0307.

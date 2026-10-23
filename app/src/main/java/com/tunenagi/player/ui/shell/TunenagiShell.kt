@@ -33,6 +33,8 @@ import androidx.navigation.compose.rememberNavController
 import com.tunenagi.core.designsystem.ShellLayout
 import com.tunenagi.core.designsystem.TunenagiMotion
 import com.tunenagi.core.designsystem.TunenagiWindowSize
+import com.tunenagi.core.model.ExternalTrack
+import com.tunenagi.player.discovery.RemoteCatalogUiState
 import com.tunenagi.player.libraryimport.ImportUiState
 import com.tunenagi.player.ui.screens.HomeScreen
 import com.tunenagi.player.ui.screens.LibraryScreen
@@ -63,6 +65,14 @@ fun TunenagiShell(
     onRetryPlayback: () -> Unit = {},
     importState: ImportUiState = ImportUiState.Idle,
     onImportMusic: () -> Unit = {},
+    searchState: RemoteCatalogUiState = RemoteCatalogUiState.Idle,
+    onSearchQuery: (String) -> Unit = {},
+    onRetrySearch: () -> Unit = {},
+    onPlayRemoteTrack: (ExternalTrack) -> Unit = {},
+    trendingState: RemoteCatalogUiState = RemoteCatalogUiState.Idle,
+    onBrowseAudius: () -> Unit = {},
+    onPlayTrending: (ExternalTrack) -> Unit = {},
+    onRetryTrending: () -> Unit = {},
     layout: ShellLayout = TunenagiWindowSize.layoutFor(LocalConfiguration.current.screenWidthDp),
     navController: NavHostController = rememberNavController()
 ) {
@@ -107,6 +117,14 @@ fun TunenagiShell(
                     motionEnabled = motionEnabled,
                     importState = importState,
                     onImportMusic = onImportMusic,
+                    searchState = searchState,
+                    onSearchQuery = onSearchQuery,
+                    onRetrySearch = onRetrySearch,
+                    onPlayRemoteTrack = onPlayRemoteTrack,
+                    trendingState = trendingState,
+                    onBrowseAudius = onBrowseAudius,
+                    onPlayTrending = onPlayTrending,
+                    onRetryTrending = onRetryTrending,
                     modifier = Modifier.weight(1f)
                 )
                 if (miniPlayerVisible && layout == ShellLayout.Wide) {
@@ -128,6 +146,14 @@ private fun ShellNavHost(
     motionEnabled: Boolean,
     importState: ImportUiState,
     onImportMusic: () -> Unit,
+    searchState: RemoteCatalogUiState,
+    onSearchQuery: (String) -> Unit,
+    onRetrySearch: () -> Unit,
+    onPlayRemoteTrack: (ExternalTrack) -> Unit,
+    trendingState: RemoteCatalogUiState,
+    onBrowseAudius: () -> Unit,
+    onPlayTrending: (ExternalTrack) -> Unit,
+    onRetryTrending: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val durationMs = TunenagiMotion.navigationDurationMs(motionEnabled)
@@ -146,11 +172,20 @@ private fun ShellNavHost(
             HomeScreen(
                 onOpenSearch = { navController.switchTab(TunenagiTab.Search) },
                 importState = importState,
-                onImportMusic = onImportMusic
+                onImportMusic = onImportMusic,
+                trendingState = trendingState,
+                onBrowseAudius = onBrowseAudius,
+                onPlayTrending = onPlayTrending,
+                onRetryTrending = onRetryTrending
             )
         }
         composable(TunenagiTab.Search.route) {
-            SearchScreen()
+            SearchScreen(
+                state = searchState,
+                onSearchQuery = onSearchQuery,
+                onRetrySearch = onRetrySearch,
+                onPlayRemoteTrack = onPlayRemoteTrack
+            )
         }
         composable(TunenagiTab.Library.route) {
             LibraryScreen(onOpenSearch = { navController.switchTab(TunenagiTab.Search) })
