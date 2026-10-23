@@ -93,3 +93,48 @@
   still stands (a gated-but-streamable row is discovered late, at resolve, with 401).
 - **Commit SHA**: see the TUN-0305 commit added after this entry.
 - **Next exact action**: claim TUN-0306 (real Audius live smoke), then TUN-0307.
+
+## 2026-10-23T07:20Z - Buffy session (phase 03, TUN-0306)
+
+- **Phase/task**: Phase 03 / TUN-0306 "Real Audius live playback smoke" - the first live
+  provider proof in this repository, executed from `run_check.py` manifests.
+- **Summary**: `AudiusLiveSmokeTest` (opt-in via `-Daudius.live=true`; skipped by an `Assume`
+  otherwise, so CI never calls the provider) drives the **production** `OkHttpTransport`,
+  `AudiusApi`, `AudiusNormalization` and `AudiusStreamResolver` against the real `api.audius.co`,
+  seven requests per run, 600ms apart. Results: search and trending answered `200` with ten of
+  ten rows playable; a currently permitted public track (`GJY7l`, `is_streamable=true`) resolved
+  to a fresh content-node URL; opening that URL the way a player would answered
+  `206 audio/mpeg` with real audio bytes over HTTPS. The negative path found a real defect: a
+  well-formed id that resolves to no track is answered **`400`, not the documented `404`**, which
+  the generic mapping turned into "the provider's answer could not be read" - `AudiusStreamResolver`
+  now maps `400` to `NotFound` for this endpoint (the request cannot be malformed), pinned by a
+  new MockWebServer contract test. ADR-017's open question is settled: anonymous reads with the
+  documented identity work, no key is required (ADR-019).
+- **Failing runs kept as evidence**: `...live_audius_smoke.json` (exit 1, compile error on a
+  nullable `Response.body`), `...live_audius_smoke2.json` (exit 1, the assertion that exposed
+  the live `400`), `...live_negative_probe.json` (exit 1, recorded the actual `400` line),
+  `...device-preflight.json` (exit 2 - the honest "no usable runtime" report).
+- **Change paths**: `core/src/test/java/com/tunenagi/core/network/AudiusLiveSmokeTest.kt` (new),
+  `core/src/main/java/com/tunenagi/core/provider/audius/AudiusStreamResolver.kt`,
+  `core/src/test/java/com/tunenagi/core/network/AudiusStreamResolverTest.kt`,
+  `core/build.gradle.kts` (live-flag forwarding through `providers.systemProperty`),
+  `STATE/decisions.md` (ADR-019), `STATE/blockers.md` (runtime re-confirmation),
+  `OPERATIONS/DEFERRED_VERIFICATION.md`, `STATE/tasks.json`.
+- **Commands and exit codes (evidence paths)**:
+  - `python SCRIPTS/device_evidence.py --preflight` -> exit 2: "no usable runtime" (emulator
+    acceleration unavailable, nothing changed) (`STATE/evidence/TUN-0306/20261023T065805Z-device-preflight.json`).
+  - `bash gradlew -Daudius.live=true :core:testDebugUnitTest --tests AudiusLiveSmokeTest
+    --tests AudiusStreamResolverTest --rerun` -> exit 0, BUILD SUCCESSFUL with the LIVE log lines
+    quoted above (`STATE/evidence/TUN-0306/20261023T071509Z-live_smoke_final.json`).
+  - `python SCRIPTS/verify.py` -> recorded in the manifest named by `taskctl verify` below.
+- **Device / emulator observations**: the runtime was re-tested, not assumed - default
+  acceleration fails (`-accel-check` exit 6, driver not installed) and every `-no-accel` TCG
+  launch freezes with a qemu process that accumulates no CPU time; processes and AVD locks were
+  cleaned up. This is the documented ADR-008 dead end, reconfirmed in `STATE/blockers.md`. The
+  `LIVE ... device-serial=none` lines say so in the evidence itself; no device artefact was
+  fabricated. The device half (decoder, audible output, notification) stays in
+  `OPERATIONS/DEFERRED_VERIFICATION.md` and must be re-run for real when a runtime exists.
+- **Blockers or risks**: no new P0 blocker. LRCLIB/MusicBrainz live calls remain for phase 05;
+  the gated-but-streamable row still fails late at resolve (ADR-018 follow-up) for TUN-0307.
+- **Commit SHA**: see the TUN-0306 commit added after this entry.
+- **Next exact action**: claim TUN-0307 (source inspector and manual preference).

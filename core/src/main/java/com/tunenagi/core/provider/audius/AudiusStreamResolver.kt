@@ -127,7 +127,19 @@ class AudiusStreamResolver(
             is HttpResult.Response -> result
         }
         if (response.status !in 200..299) {
-            return ProviderResult.Failure(ProviderError.fromHttpStatus(response.status, response.retryAfter))
+            // Observed live by the TUN-0306 smoke on 2026-10-23: an id that is well formed but
+            // resolves to no track is answered `400 Bad Request`, not the `404` the provider's
+            // OpenAPI document suggests. The request this class builds cannot itself be malformed
+            // - the id is regex-checked above and the parameters are fixed - so the only thing a
+            // `400` can mean here is "no such track", and that is what the user is told instead
+            // of "the provider's answer could not be read". Every other status keeps the
+            // taxonomy's own mapping.
+            val error = if (response.status == 400) {
+                ProviderError.NotFound
+            } else {
+                ProviderError.fromHttpStatus(response.status, response.retryAfter)
+            }
+            return ProviderResult.Failure(error)
         }
         val body = response.body ?: return ProviderResult.Failure(ProviderError.MalformedPayload)
         val envelope = try {

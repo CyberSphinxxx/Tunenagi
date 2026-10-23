@@ -1,8 +1,8 @@
 # Tunenagi blockers
 
-**No P0 task is currently blocked.** Phase 02 is audited (PASS for the machine-verifiable half) and
-phase 03 is open. The device-only proof for every phase remains deferred under ADR-008 and is
-recorded in `OPERATIONS/DEFERRED_VERIFICATION.md`, not as a task blocker.
+**No P0 task is currently blocked.** Each audited phase passed its machine-verifiable half; the
+device-only proof for every phase remains deferred under ADR-008 and is recorded in
+`OPERATIONS/DEFERRED_VERIFICATION.md`, not as a task blocker.
 
 The resolved entries below are kept so a future session does not repeat the same dead end.
 
@@ -89,6 +89,18 @@ them. All three were real and are fixed:
 :app:assembleDebug :core:testDebugUnitTest --no-build-cache --no-configuration-cache`,
 exit code 0, 72/72 tasks executed. The APK facts are in
 `STATE/evidence/TUN-0002/apk-debug-build-artifact.txt`.
+
+## RECONFIRMED 2026-10-23 — still no Android runtime (TUN-0306)
+
+The runtime half of ADR-008 was re-tested for TUN-0306 rather than assumed: default acceleration
+fails with "Android Emulator hypervisor driver is not installed" (`emulator -accel-check` exit 6),
+and every `-no-accel` TCG launch freezes with a qemu process that accumulates no CPU time — the
+same measured dead end `OPERATIONS/EMULATOR_RUNTIME.md` records. The stalled processes and the
+AVD lock files were cleaned up, and `SCRIPTS/device_evidence.py --preflight` was captured as
+`STATE/evidence/TUN-0306/20261023T065805Z-device-preflight.json`: "no usable runtime". TUN-0306's
+live proof therefore ran on the JVM through the production classes (ADR-019) with the device half
+deferred; nothing changed about the standing owner options — install a hypervisor driver (needs
+admin + reboot) or attach a device with USB debugging, and the deferred tasks get re-run for real.
 
 ### Honest residual note
 

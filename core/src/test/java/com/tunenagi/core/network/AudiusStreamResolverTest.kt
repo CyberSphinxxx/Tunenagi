@@ -174,6 +174,19 @@ class AudiusStreamResolverTest {
     }
 
     @Test
+    fun a400ForAWellFormedIdIsNotFoundAsTheLiveServiceAnswers() = runBlocking {
+        // Observed by the TUN-0306 live smoke on 2026-10-23: a well-formed id that resolves to
+        // no track is answered with `400`, not the `404` the OpenAPI document suggests. The
+        // request cannot itself be malformed, so 400 here means "no such track" and the user
+        // is told that instead of that a valid answer could not be read.
+        server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error":"bad request"}"""))
+
+        val result = resolver().resolve(track, source())
+
+        assertEquals(ProviderError.NotFound, failure(result))
+    }
+
+    @Test
     fun a403IsReportedAsRestricted() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(403))
 

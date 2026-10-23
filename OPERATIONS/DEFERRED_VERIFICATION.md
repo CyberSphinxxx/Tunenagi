@@ -30,7 +30,7 @@ A substitute is used for the parts that can honestly be substituted, and nothing
 | Track normalization and entitlement (TUN-0302) | deterministic JVM tests over DTOs built to the documented shape (no network) | mapping to the provider-neutral `ExternalTrack`, deleted/restricted/available entitlement, attribution and placeholder rules, page diagnostics and skip counts | that a real Audius catalog row maps as expected, that a creator's restriction is currently reported by the live API, and that a real search page's mix of rows behaves as assumed |
 | Public stream resolution (TUN-0303) | the real resolver and the production `OkHttpTransport` against a real `MockWebServer` on loopback, plus a recording transport for the production HTTPS policy | that the documented request is made (`/v1/tracks/{id}/stream` with `app_name` and `no_redirect=true` and nothing else), that a restricted source is refused without any request, that a redirect is not followed, that downgraded/userinfo URL forms are rejected, and that 401/403/404/429/body faults map to the typed errors | that a live Audius stream answers this device, that the returned content-node URL is currently valid for that track, real audio output, or the live service's URL-expiry behaviour (which the provider does not document) |
 | Storage | Room in-memory + migration tests on the JVM | schema, DAO queries, migration correctness | real on-device storage behaviour, process death, large real libraries |
-| Live third-party smoke | none | — | an actual Audius/LRCLIB/MusicBrainz request never happened; no live artifact exists |
+| Live third-party smoke | the opt-in `AudiusLiveSmokeTest` (TUN-0306) drives the production transport, API, normalization and stream resolver against the real `api.audius.co`, rate-respecting and never in CI | live search/trending answers, a currently permitted public track resolving to a fresh HTTPS URL that served `audio/mpeg` bytes, and the live `400 -> NotFound` behaviour no mock could show | a device decoder accepting those bytes, audible output, a lockscreen/notification surface, and LRCLIB/MusicBrainz live calls (phase 05) |
 
 ## The three verification classes, stated plainly
 
@@ -46,8 +46,11 @@ A substitute is used for the parts that can honestly be substituted, and nothing
   screenshots; API 26/33/35 matrix; rotation, font scale 1.3x/2.0x, small-screen 360x640dp,
   tablet 800dp+; gesture vs three-button navigation; notification/media-session controls; audio
   focus and headset/bluetooth behaviour; screen-lock and background-survival; upgrade-in-place.
-- **Live provider proof**: Audius discovery and public-track streaming, LRCLIB lyrics fetch and
-  MusicBrainz enrichment against the real services with recorded timestamps and redacted URLs.
+- **Live provider proof**: Audius discovery and public-track streaming **were proven live on
+  2026-10-23** (TUN-0306's `AudiusLiveSmokeTest`, recorded statuses with redacted URLs and UTC
+  timestamps; see ADR-019). Still unperformed: LRCLIB lyrics fetch and MusicBrainz enrichment
+  against the real services (phase 05), and the device half of the Audius proof - a decoder
+  accepting the bytes, audible output, and the notification/lockscreen surface.
 - **Owner-held artefacts**: release signing keystore, store/F-Droid publication, CI execution on
   GitHub runners (the workflow definition is checked locally; it has never run).
 - **Performance**: Macrobenchmark startup/jank/memory numbers from a device; no threshold in

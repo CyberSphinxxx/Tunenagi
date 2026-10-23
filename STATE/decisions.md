@@ -677,3 +677,45 @@ second endpoint if the first refuses.
 
 **Owner review needed?** No new decision for the owner: no credential is required or invented. The
 live smoke (TUN-0306) still needs a real device and a currently permitted public track.
+
+## ADR-019 - The live smoke ran: anonymous reads work, and 400 means "no such track" (2026-10-23)
+
+**Context**: TUN-0306 was the first request this repository ever sent to the real Audius API.
+ADR-017 predicted that an owner-supplied read key might be needed; the smoke settled that. The
+opt-in `AudiusLiveSmokeTest` drives the production `OkHttpTransport`, `AudiusApi`,
+`AudiusNormalization` and `AudiusStreamResolver` against `api.audius.co`, rate-respecting (seven
+requests per run, 600ms apart, far under the documented 10 req/s) and never in CI (the suite is
+skipped by an `Assume` unless `-Daudius.live=true` is passed). Findings, all recorded in
+`STATE/evidence/TUN-0306/`:
+
+- Anonymous reads with the documented identity (`app_name` + the app's `User-Agent`) work: search
+  and trending answered `200`, and ten of ten rows normalized as playable.
+- A currently permitted public track resolved to a fresh content-node URL, and opening that URL the
+  way a player would answered `206 audio/mpeg` with real audio bytes over HTTPS.
+- The live service answers **`400 Bad Request`, not the documented `404`**, for a well-formed id
+  that resolves to no track. The generic `fromHttpStatus` mapped that to `MalformedPayload`, which
+  would tell a user holding a stale row that a valid answer could not be read - the wrong thing to
+  say. (A non-app `User-Agent` gets a Cloudflare `403` error 1010 instead, which is one more reason
+  the app sends its documented identity.)
+
+**Decision**: (1) no key is required for the public read path, and `AudiusApi` stays as built with
+its optional key parameter untouched. (2) `AudiusStreamResolver` maps `400` to `NotFound` for this
+endpoint: the request the class builds cannot be malformed (the id is regex-checked and the
+parameters are fixed), so the only thing a `400` can mean is "no such track", and the taxonomy's
+`NotFound` is the honest state. Every other status keeps `fromHttpStatus`, and the live observation
+is recorded in the code comment and pinned by a MockWebServer contract test.
+
+**Consequences**:
+- The live proof is the network half only; the device half (a decoder accepting those bytes,
+  audible output, the notification) stays deferred under ADR-008 and is recorded per task in
+  `OPERATIONS/DEFERRED_VERIFICATION.md`. No device artefact was fabricated.
+- CI still never calls the provider: without the property the suite is skipped, and
+  `core/build.gradle.kts` forwards the flag through `providers.systemProperty` so the
+  configuration cache treats it as a real input.
+- LRCLIB and MusicBrainz live calls belong to phase 05 and remain unperformed.
+
+**Affected tasks**: TUN-0306 (this slice), TUN-0303 (the resolver mapping), TUN-0307.
+
+**Owner review needed?** No: no credential is required or introduced, no P0 acceptance changed,
+and the mapping fix makes an existing taxonomy state reachable in the case the live service
+actually produces.
