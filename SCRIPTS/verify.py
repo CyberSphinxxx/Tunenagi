@@ -63,6 +63,13 @@ def gradle_command():
     """How to invoke the wrapper on this host, matching GIT_CONVENTIONS.md."""
     if shutil.which("bash") and (ROOT / "gradlew").is_file():
         return ["bash", "gradlew"]
+    for git_bash in (
+        Path("C:/Program Files/Git/bin/bash.exe"),
+        Path("C:/Program Files/Git/usr/bin/bash.exe"),
+    ):
+        if git_bash.is_file() and (ROOT / "gradlew").is_file():
+            os.environ["PATH"] = str(git_bash.parent) + os.pathsep + os.environ.get("PATH", "")
+            return ["bash", "gradlew"]
     if os.name == "nt":
         return [os.environ.get("COMSPEC", "cmd"), "/c", "gradlew.bat"]
     return ["./gradlew"]

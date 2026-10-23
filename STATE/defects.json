@@ -65,6 +65,18 @@
       "resolution": "PlaybackQueueCommands.apply now writes snapshot.repeatMode to the player on every apply/restore, and restoreReappliesThePersistedRepeatModeToAFreshPlayer proves a second player over the same stored queue comes back with Repeat All and without autoplay.",
       "evidence": "STATE\\evidence\\TUN-0204\\20261020T081303Z-repeat-mode-restored-after-restart.json",
       "closedUtc": "2026-10-20T08:13:46+00:00"
+    },
+    {
+      "id": "BUG-0006",
+      "phase": "03",
+      "relatedTask": "TUN-0302",
+      "severity": "Medium",
+      "status": "open",
+      "title": "Gated-but-streamable rows appear playable until resolve answers 401",
+      "reproduction": "Unit-level: the discovery DTO has no gating field, so AudiusNormalization maps a row with is_streamable=true to SourceAvailability.Available unconditionally; ADR-018 records that a track with access_authorities answers 401 to the unsigned stream request. Consequence: the discovery row and the source inspector both say Ready to play and the refusal only appears when the user taps the track. No bypass happens (the typed Unauthorized failure is honest and no substitute source is tried); the gap is that the unplayable state is shown late rather than up front, which SPEC/PROVIDERS.md asks to show as an unplayable state.",
+      "foundUtc": "2026-10-23T08:56:09+00:00",
+      "resolution": null,
+      "evidence": null
     }
   ]
 }

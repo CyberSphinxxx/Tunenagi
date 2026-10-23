@@ -531,10 +531,10 @@
       ],
       "status": "verified",
       "evidence": [
-        "STATE/audits/phase-03-20261020-tun0301.md",
-        "STATE/evidence/TUN-0301/20261020T172948Z-verify-all-steps.json"
+        "STATE/evidence/TUN-0301/20261023T084858Z-verify-restored-by-phase03-audit.json",
+        "STATE/audits/phase-03-20261020-tun0301.md"
       ],
-      "notes": "Audited 2026-10-20 from a fresh context after TUN-0208; machine-verifiable half PASS. Live Audius smoke and device proof are outstanding under ADR-008 and ADR-017; the audit does not claim them."
+      "notes": "Audited 2026-10-20 from a fresh context after TUN-0208; machine-verifiable half PASS. Live Audius smoke and device proof are outstanding under ADR-008 and ADR-017; the audit does not claim them. Evidence repaired 2026-10-23 during the phase-03 audit: the original STATE/evidence/TUN-0301/20261020T172948Z-verify-all-steps.json was found missing on disk (the whole TUN-0301 evidence directory was absent; evidence is gitignored, so the original run is unrecoverable). The replacement is a fresh full verify.py run captured at audit time, not a recreation of the old log."
     },
     {
       "id": "TUN-0302",
@@ -694,9 +694,9 @@
       "evidenceKinds": [
         "command"
       ],
-      "status": "todo",
+      "status": "in_progress",
       "evidence": [],
-      "notes": ""
+      "notes": "Claimed 2026-10-23T13:45:42+00:00"
     },
     {
       "id": "TUN-0402",
